@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f4f2ed;
+  --color-card: #ffffff;
+  --color-line: #e2ded5;
+  --color-line-strong: #c6c2b8;
+  --color-ink: #15161a;
+  --color-muted: #5c5e66;
+  --color-micro: #6b6d75;
+  --color-input: #faf9f6;
+  --color-green: #1f6f5c;
+  --color-green-dark: #164f42;
+  --color-green-soft: #ecefe9;
+  --color-green-line: #c9d6cd;
+  --color-brick: #8f2f12;
+  --color-brick-soft: #fbf1ee;
+
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+@layer components {
+  .card {
+    @apply rounded-[14px] border border-line bg-card;
+  }
+
+  /* apró, ritkított nagybetűs szekciócímke */
+  .micro {
+    @apply text-xs font-semibold uppercase tracking-[0.08em] text-micro;
+  }
+
+  .label {
+    @apply mb-2.5 block text-sm font-semibold text-ink;
+  }
+
+  .hint {
+    @apply mt-2 block text-sm leading-relaxed text-muted;
+  }
+
+  .field {
+    @apply w-full rounded-[10px] border border-line bg-input px-3.5 py-3 text-[15px] leading-relaxed
+           text-ink outline-none transition placeholder:text-micro/70
+           focus:border-green focus:ring-2 focus:ring-green/15;
+  }
+
+  .btn {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px]
+           px-5 py-3 text-[15px] font-semibold transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px]
+           px-5 py-3 text-[15px] font-semibold transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+    @apply bg-green text-white hover:bg-green-dark;
+  }
+
+  .btn-ghost {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px]
+           px-5 py-3 text-[15px] font-semibold transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+    @apply border border-line-strong bg-transparent text-ink hover:bg-card;
+  }
+
+  .btn-quiet {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[10px]
+           px-5 py-3 text-[15px] font-semibold transition
+           disabled:cursor-not-allowed disabled:opacity-40;
+    @apply px-4 font-normal text-muted hover:text-ink;
+  }
+
+  /* pirula-választó: aktív = tintafekete */
+  .pill {
+    @apply rounded-full border border-line bg-paper px-[18px] py-2.5 text-sm text-muted
+           transition hover:border-line-strong hover:text-ink;
+  }
+
+  .pill-on {
+    @apply rounded-full border border-ink bg-ink px-[18px] py-2.5 text-sm font-semibold text-white;
+  }
+
+  .tag {
+    @apply rounded-full bg-green-soft px-3 py-1.5 text-[11px] font-semibold uppercase
+           tracking-[0.06em] text-green-dark;
+  }
+}
