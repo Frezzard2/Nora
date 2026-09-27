@@ -8,9 +8,9 @@ const GOAL_LABEL: Record<string, string> = {
 };
 
 const LENGTH_RULE: Record<string, string> = {
-  rovid: "1-2 nagyon rövid mondat.",
-  kozepes: "2-3 rövid mondat.",
-  reszletes: "3-4 mondat, de akkor sem hosszabb egy bekezdésnél.",
+  rovid: "1-3 rövid mondat.",
+  kozepes: "2-4 rövid mondat.",
+  reszletes: "3-5 mondat, de akkor sem hosszabb egy bekezdésnél.",
 };
 
 const EMOJI_RULE: Record<string, string> = {
@@ -68,6 +68,19 @@ export function buildSystemPrompt(c: NoraConfig): string {
           : ""),
     );
   }
+
+  sections.push(
+    `## A válasz felépítése (EZ A LEGFONTOSABB SZABÁLY)\n` +
+      `1. ELŐSZÖR válaszolj arra, amit az érdeklődő ténylegesen kérdezett vagy kért. ` +
+      `Konkrétan, tartalommal — ne általánosságban.\n` +
+      `2. UTÁNA, ha még van nyitott kvalifikáló kérdésed, tegyél fel EGYET, ` +
+      `a válaszodhoz kapcsolódva.\n` +
+      `SOHA ne küldj olyan üzenetet, ami csak egy visszakérdezés. ` +
+      `Ha valaki azt kéri, hogy "mesélj többet", akkor tényleg mesélj: mondj 1-2 konkrétumot ` +
+      `az ajánlatról, és csak ez után kérdezz vissza. ` +
+      `A visszakérdezés a válasz kiegészítése, nem a helyettesítője.\n` +
+      `Kivétel: ha az érdeklődő maga sem kérdezett semmit (pl. csak köszön), akkor elég a kérdés.`,
+  );
 
   sections.push(
     `## Hangnem\n${szemely} az érdeklődőt.\n${EMOJI_RULE[hangnem.emoji]}\n` +
