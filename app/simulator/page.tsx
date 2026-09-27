@@ -35,8 +35,15 @@ export default function Simulator() {
   const [activeScenario, setActiveScenario] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setConfig(mergeConfig(loadConfig() ?? emptyConfig())), []);
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, busy]);
+  useEffect(() => {
+    setConfig(mergeConfig(loadConfig() ?? emptyConfig()));
+  }, []);
+  // Csak a beszélgetés-sávot görgetjük. A scrollIntoView az összes szülőt
+  // görgetné, amitől mobilon az oldal a chat alá ugrana betöltéskor.
+  useEffect(() => {
+    const box = endRef.current?.parentElement;
+    box?.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+  }, [messages, busy]);
 
   const adapter = CHANNELS[channel];
   const { theme } = adapter;
