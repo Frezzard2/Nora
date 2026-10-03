@@ -1,0 +1,43 @@
+{
+  "alapok": {
+    "nev": "",
+    "markanev": "",
+    "kinekMibenSegit": "",
+    "nyelv": "magyar"
+  },
+  "ajanlat": {
+    "foSzolgaltatas": "",
+    "ar": "",
+    "arElarulhato": true,
+    "cel": "hivas",
+    "celLink": ""
+  },
+  "kvalifikacio": {
+    "kerdesek": [],
+    "rosszUgyfelJelei": "",
+    "minimumFeltetelek": ""
+  },
+  "hangnem": {
+    "megszolitas": "tegezodes",
+    "emoji": "ritkan",
+    "valaszHossz": "rovid",
+    "dmPeldak": "",
+    "tipikusFordulatok": "",
+    "tiltottSzavak": ""
+  },
+  "gyik": [],
+  "hatarok": {
+    "atadasEsetei": [
+      "Panasz",
+      "Ár-alku",
+      "Érzékeny egészségügyi vagy személyes téma",
+      "Dühös üzenet"
+    ],
+    "sohaNeMondja": "",
+    "fallbackMondat": ""
+  },
+  "inditok": {
+    "forrasok": ["instagram"],
+    "kampanyKulcsszo": ""
+  }
+}
