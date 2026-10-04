@@ -1,6 +1,9 @@
 import Link from "next/link";
+import clientConfig from "@/config/client.json";
 import TopBar from "@/components/TopBar";
+import { configGaps, envGaps } from "@/lib/readiness";
 import { isBotEnabled, listConversations, type Conversation } from "@/lib/store";
+import type { NoraConfig } from "@/lib/types";
 import { toggleConversation, toggleGlobal } from "./actions";
 import { State, money, when } from "./ui";
 
@@ -8,6 +11,31 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Nora — admin" };
 
 const lastText = (c: Conversation) => c.messages.at(-1)?.text ?? "(még nincs üzenet)";
+
+/** Üzembe állítási figyelmeztetés — ebből látszik, mi hiányzik még. */
+function Setup() {
+  const env = envGaps();
+  const config = configGaps(clientConfig as unknown as NoraConfig);
+  if (!env.length && !config.length) return null;
+
+  return (
+    <div className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3.5 text-[15px] leading-relaxed text-brick">
+      <strong className="font-semibold">A beállítás még nincs kész.</strong>
+      {env.length > 0 && (
+        <p className="mt-1.5">
+          Hiányzó környezeti változó: <code className="font-semibold">{env.join(", ")}</code>
+        </p>
+      )}
+      {config.length > 0 && (
+        <p className="mt-1.5">
+          Hiányzó mező a <code className="font-semibold">config/client.json</code>-ban:{" "}
+          <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a bot
+          tárolja az üzeneteket, de nem válaszol.
+        </p>
+      )}
+    </div>
+  );
+}
 
 export default async function Admin() {
   const [conversations, globalOn] = await Promise.all([listConversations(), isBotEnabled()]);
@@ -38,6 +66,8 @@ export default async function Admin() {
             </button>
           </form>
         </div>
+
+        <Setup />
 
         {!globalOn && (
           <p className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3 text-[15px] text-brick">

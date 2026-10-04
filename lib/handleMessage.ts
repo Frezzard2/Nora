@@ -1,6 +1,7 @@
 import "server-only";
 import rawConfig from "@/config/client.json";
 import { sendMessage } from "./instagram";
+import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
 import { bump, isBotEnabled, update, type StoredMessage } from "./store";
 import type { NoraConfig } from "./types";
@@ -32,6 +33,17 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
 
   if (conv.handedOff) return;
   if (!conv.botEnabled) return;
+
+  // Kitöltetlen konfiggal az AI csak általánosságokat írna. Éles fiókon inkább
+  // ne válaszoljunk: az üzenet tárolva van, az admin felületen látszik.
+  const gaps = configGaps(CONFIG);
+  if (gaps.length) {
+    console.error(
+      `[nora] A config/client.json hiányos (${gaps.join(", ")}) — nincs válasz. ` +
+        "Töltsd ki az /onboarding varázslóval, exportáld, és másold be a fájlba.",
+    );
+    return;
+  }
   if (!(await isBotEnabled())) {
     console.info("[nora] Globális vészkapcsoló ki van kapcsolva — nincs válasz.");
     return;

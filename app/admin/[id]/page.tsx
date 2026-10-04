@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import TopBar from "@/components/TopBar";
-import { getConversation } from "@/lib/store";
+import { conversationExists, getConversation } from "@/lib/store";
 import { toggleConversation } from "../actions";
 import { State, money, when } from "../ui";
 
@@ -8,7 +9,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const conv = await getConversation(decodeURIComponent(id));
+  const convId = decodeURIComponent(id);
+  // különben bármilyen URL-re egy üres fantom-beszélgetést rajzolnánk ki
+  if (!(await conversationExists(convId))) notFound();
+  const conv = await getConversation(convId);
 
   return (
     <>

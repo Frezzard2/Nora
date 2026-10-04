@@ -55,6 +55,11 @@ export async function getConversation(id: string): Promise<Conversation> {
   return (await db().get<Conversation>(KEY.conv(id))) ?? fresh(id);
 }
 
+/** Van-e már eltárolva ilyen beszélgetés? (Az admin csak létezőt módosíthat.) */
+export async function conversationExists(id: string): Promise<boolean> {
+  return (await db().exists(KEY.conv(id))) === 1;
+}
+
 /**
  * Olvasás → módosítás → írás egy lépésben.
  * ponytail: nincs lock. Egy beszélgetésen belül az üzenetek sorban érkeznek,

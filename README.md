@@ -15,6 +15,12 @@ npm run check                  # a logikai önellenőrzések
 A konfigurációt az `/onboarding` varázslóval állítod össze, exportálod JSON-ba, és
 a tartalmát bemásolod a **`config/client.json`** fájlba. Ebből dolgozik az élő bot.
 
+> **Amíg ez nincs kitöltve, a bot nem válaszol** — az üzeneteket eltárolja, és az
+> `/admin` oldal felül megmutatja, melyik mező hiányzik. Ez szándékos: éles fiókon
+> rosszabb egy általánosságokat író bot, mint a csend. Kötelező mezők:
+> `alapok.nev` (vagy `markanev`), `alapok.kinekMibenSegit`, `ajanlat.foSzolgaltatas`,
+> `ajanlat.celLink`.
+
 | Útvonal | Mi ez |
 |---|---|
 | `/onboarding` | Beállító varázsló (localStorage + JSON export) |
@@ -75,13 +81,21 @@ Ha 403-at kapsz: a token nem egyezik, vagy a deploy még a régi env-vel fut.
 Utána a **messages** mezőre fel kell iratkozni (*Subscribe*). A `messaging_postbacks`
 nem szükséges, a bot csak szöveget kezel.
 
-### 5. Teszt
+### 5. Konfiguráció feltöltése
+
+Nyisd meg a deployolt `/onboarding`-ot, menj végig a varázslón, **Exportálás** →
+a letöltött JSON tartalmát írd a `config/client.json`-ba, commitold, deployolj újra.
+
+Az `/admin` tetején lévő piros sáv addig látszik, amíg env változó vagy
+konfigurációs mező hiányzik — ha eltűnt, minden a helyén van.
+
+### 6. Teszt
 
 Írj egy DM-et a fiókra **egy másik Instagram fiókról** (a sajátodnak küldött üzenet
 echo-ként jön vissza, azt a webhook kiszűri). Pár másodperc után jön a válasz, és a
 beszélgetés megjelenik az `/admin` felületen.
 
-### 6. Publikálás (élő fiókhoz, fejlesztői módon túl)
+### 7. Publikálás (élő fiókhoz, fejlesztői módon túl)
 
 Development módban csak az app szerepkörrel rendelkező fiókjai tudnak írni. Élesítéshez
 az App Review-hoz kell: `instagram_business_basic`, `instagram_business_manage_messages`,
@@ -138,3 +152,18 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 - Globális vészkapcsoló az `/admin` felületen — azonnal elhallgattatja a botot.
 - Duplikált kézbesítés szűrése `message.mid` alapján, 24 órás lejárattal.
 - Titkok csak szerveroldalon: nincs `NEXT_PUBLIC_` kulcs, a `.env.local` nincs a repóban.
+- Az admin kapcsolók csak már létező beszélgetést módosítanak (hamisított POST nem
+  tud szemét rekordot írni a tárolóba).
+- Kitöltetlen konfigurációval a bot nem válaszol.
+
+## Másik fiókra átállítás
+
+Csak három dolog fiókspecifikus — kód nem változik:
+
+1. Új Meta app az adott Instagram professional fiókhoz (3. lépés) →
+   új `IG_APP_SECRET` és `IG_ACCESS_TOKEN`.
+2. Új `config/client.json` az adott ügyfél kérdőívéből.
+3. Webhook URL újra beállítva a Meta dashboardon (4. lépés).
+
+Az `IG_ACCESS_TOKEN` 60 naponta lejár — ilyenkor a napló
+`[instagram] Küldés sikertelen` sorral jelez, és a Meta dashboardon kell újat generálni.
