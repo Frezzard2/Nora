@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
-import { firstDelivery } from "@/lib/store";
+import { firstDelivery, noteUnhandled } from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -30,6 +30,22 @@ type Entry = {
   changes?: { field?: string; value?: MessagingEvent }[];
 };
 type Payload = { entry?: Entry[] };
+
+/**
+ * Egy érték szerkezete: kulcsok és típusok, a tartalom nélkül. Így a beállítás
+ * közben látjuk, milyen alakban küld a Meta, anélkül hogy ügyfél-üzenet kerülne
+ * a naplóba vagy a tárolóba.
+ */
+function shapeOf(value: unknown, depth = 0): unknown {
+  if (depth > 5) return "…";
+  if (Array.isArray(value)) return value.length ? [shapeOf(value[0], depth + 1)] : [];
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, shapeOf(v, depth + 1)]),
+    );
+  }
+  return typeof value;
+}
 
 /**
  * A valódi Instagram-üzenetek az `entry[].messaging` tömbben jönnek, a Meta
@@ -69,7 +85,11 @@ async function process_(payload: Payload) {
   // egy payloadban több entry, egy entryben több esemény is lehet
   for (const entry of payload.entry ?? []) {
     const events = eventsOf(entry);
-    if (!events.length) console.info("[webhook] Entry feldolgozható esemény nélkül, kihagyva.");
+    if (!events.length) {
+      const shape = shapeOf(entry);
+      console.info("[webhook] Feldolgozható esemény nélküli entry. Szerkezet:", JSON.stringify(shape));
+      await noteUnhandled(shape);
+    }
 
     for (const event of events) {
       const msg = event.message;

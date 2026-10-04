@@ -30,6 +30,7 @@ const KEY = {
   seen: (mid: string) => `nora:seen:${mid}`,
   botSwitch: "nora:bot",
   config: "nora:config",
+  lastUnhandled: "nora:debug:last-unhandled",
   counter: (scope: string) => `nora:count:${scope}`,
 };
 
@@ -111,6 +112,19 @@ export async function getStoredConfig<T>(): Promise<T | null> {
 /** A varázslóból mentett konfiguráció. Ez nyer az env változó és a fájl felett. */
 export async function setStoredConfig(config: unknown): Promise<void> {
   await db().set(KEY.config, config);
+}
+
+/**
+ * Hibakereséshez: a legutóbbi feldolgozhatatlan webhook-payload SZERKEZETE
+ * (kulcsok és típusok, értékek nélkül). Beállításkor ebből derül ki, ha a Meta
+ * más alakban küld, mint amit a kód vár. Egy nap után lejár.
+ */
+export async function noteUnhandled(shape: unknown): Promise<void> {
+  await db().set(KEY.lastUnhandled, { at: new Date().toISOString(), shape }, { ex: 60 * 60 * 24 });
+}
+
+export async function getUnhandled<T>(): Promise<T | null> {
+  return await db().get<T>(KEY.lastUnhandled);
 }
 
 /** Lejáró számláló (napi/óránkénti korlátokhoz). A számláló új értékét adja. */
