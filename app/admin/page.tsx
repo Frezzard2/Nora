@@ -1,9 +1,8 @@
 import Link from "next/link";
-import clientConfig from "@/config/client.json";
 import TopBar from "@/components/TopBar";
+import { clientConfig } from "@/lib/clientConfig";
 import { configGaps, envGaps } from "@/lib/readiness";
 import { isBotEnabled, listConversations, type Conversation } from "@/lib/store";
-import type { NoraConfig } from "@/lib/types";
 import { toggleConversation, toggleGlobal } from "./actions";
 import { State, money, when } from "./ui";
 
@@ -15,8 +14,9 @@ const lastText = (c: Conversation) => c.messages.at(-1)?.text ?? "(még nincs ü
 /** Üzembe állítási figyelmeztetés — ebből látszik, mi hiányzik még. */
 function Setup() {
   const env = envGaps();
-  const config = configGaps(clientConfig as unknown as NoraConfig);
-  if (!env.length && !config.length) return null;
+  const resolved = clientConfig();
+  const config = configGaps(resolved.config);
+  if (!env.length && !config.length && !resolved.error) return null;
 
   return (
     <div className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3.5 text-[15px] leading-relaxed text-brick">
@@ -26,11 +26,15 @@ function Setup() {
           Hiányzó környezeti változó: <code className="font-semibold">{env.join(", ")}</code>
         </p>
       )}
+      {resolved.error && <p className="mt-1.5">{resolved.error}</p>}
       {config.length > 0 && (
         <p className="mt-1.5">
-          Hiányzó mező a <code className="font-semibold">config/client.json</code>-ban:{" "}
-          <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a bot
-          tárolja az üzeneteket, de nem válaszol.
+          Hiányzó mező a konfigurációban (forrás:{" "}
+          <code className="font-semibold">
+            {resolved.source === "env" ? "NORA_CONFIG" : "config/client.json"}
+          </code>
+          ): <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a
+          bot tárolja az üzeneteket, de nem válaszol.
         </p>
       )}
     </div>
@@ -40,6 +44,7 @@ function Setup() {
 export default async function Admin() {
   const [conversations, globalOn] = await Promise.all([listConversations(), isBotEnabled()]);
   const totalCost = conversations.reduce((sum, c) => sum + c.costUsd, 0);
+  const { source } = clientConfig();
 
   return (
     <>
@@ -51,7 +56,8 @@ export default async function Admin() {
             <h1 className="text-[30px] font-bold leading-tight sm:text-[38px]">Beszélgetések</h1>
             <p className="mt-2 text-[15px] text-muted">
               {conversations.length} beszélgetés · összesített AI-költség{" "}
-              <strong className="text-ink">{money(totalCost)}</strong>
+              <strong className="text-ink">{money(totalCost)}</strong> · konfiguráció:{" "}
+              <code>{source === "env" ? "NORA_CONFIG" : "config/client.json"}</code>
             </p>
           </div>
 

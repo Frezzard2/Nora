@@ -1,13 +1,9 @@
 import "server-only";
-import rawConfig from "@/config/client.json";
+import { clientConfig } from "./clientConfig";
 import { sendMessage } from "./instagram";
 import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
 import { bump, isBotEnabled, update, type StoredMessage } from "./store";
-import type { NoraConfig } from "./types";
-
-/** Egy ügyfél, egy konfiguráció — a kérdőív exportált JSON-ja. */
-const CONFIG = rawConfig as unknown as NoraConfig;
 
 /** Beszélgetésenkénti napi válaszkorlát: egy hibás kör ne égessen el pénzt. */
 const DAILY_LIMIT = Number(process.env.MAX_REPLIES_PER_DAY ?? 20);
@@ -46,11 +42,12 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
 
   // Kitöltetlen konfiggal az AI csak általánosságokat írna. Éles fiókon inkább
   // ne válaszoljunk: az üzenet tárolva van, az admin felületen látszik.
-  const gaps = configGaps(CONFIG);
+  const { config, source } = clientConfig();
+  const gaps = configGaps(config);
   if (gaps.length) {
     console.error(
-      `[nora] A config/client.json hiányos (${gaps.join(", ")}) — nincs válasz. ` +
-        "Töltsd ki az /onboarding varázslóval, exportáld, és másold be a fájlba.",
+      `[nora] A konfiguráció hiányos (${gaps.join(", ")}), forrás: ${source} — nincs válasz. ` +
+        "Töltsd ki az /onboarding varázslóval, és add meg NORA_CONFIG-ként vagy a config/client.json-ban.",
     );
     return;
   }
@@ -67,7 +64,7 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
 
   let reply;
   try {
-    reply = await generateReply(CONFIG, conv.messages.map(toIncoming));
+    reply = await generateReply(config, conv.messages.map(toIncoming));
   } catch (err) {
     // a kulcsot az SDK nem teszi a hibába, de a stacket se logoljuk ki
     console.error("[nora] Válaszgenerálás sikertelen:", err instanceof Error ? err.message : err);

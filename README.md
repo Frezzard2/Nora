@@ -15,7 +15,11 @@ npm run check                  # a logikai önellenőrzések
 A konfigurációt az `/onboarding` varázslóval állítod össze, exportálod JSON-ba, és
 a tartalmát bemásolod a **`config/client.json`** fájlba. Ebből dolgozik az élő bot.
 
-> **Amíg ez nincs kitöltve, a bot nem válaszol** — az üzeneteket eltárolja, és az
+Éles üzemben viszont jobb a **`NORA_CONFIG` env változó** (ugyanaz a JSON, egy sorban) —
+akkor a repóhoz új ügyfélnél nem kell hozzányúlni. Ha be van állítva, ez nyer a fájl
+felett; az `/admin` fejléce mindig kiírja, melyikből fut.
+
+> **Amíg a konfiguráció nincs kitöltve, a bot nem válaszol** — az üzeneteket eltárolja, és az
 > `/admin` oldal felül megmutatja, melyik mező hiányzik. Ez szándékos: éles fiókon
 > rosszabb egy általánosságokat író bot, mint a csend. Kötelező mezők:
 > `alapok.nev` (vagy `markanev`), `alapok.kinekMibenSegit`, `ajanlat.foSzolgaltatas`,
@@ -83,8 +87,15 @@ nem szükséges, a bot csak szöveget kezel.
 
 ### 5. Konfiguráció feltöltése
 
-Nyisd meg a deployolt `/onboarding`-ot, menj végig a varázslón, **Exportálás** →
-a letöltött JSON tartalmát írd a `config/client.json`-ba, commitold, deployolj újra.
+Nyisd meg a deployolt `/onboarding`-ot, menj végig a varázslón, **Exportálás**.
+A letöltött JSON-t egy sorba tömörítve add meg `NORA_CONFIG` env változóként:
+
+```bash
+jq -c . ~/Downloads/nora-config.json | pbcopy    # és beillesztés a Vercelen
+```
+
+Majd **Redeploy**. (Helyi fejlesztéshez egyszerűbb a `config/client.json`-ba másolni —
+ha a `NORA_CONFIG` nincs beállítva, abból olvasunk.)
 
 Az `/admin` tetején lévő piros sáv addig látszik, amíg env változó vagy
 konfigurációs mező hiányzik — ha eltűnt, minden a helyén van.
@@ -168,7 +179,22 @@ Ami mihez tartozik:
 | `IG_ACCESS_TOKEN` | a **fiókhoz** — csak ez fiókspecifikus |
 | Callback URL | az apphoz: **egy app = egy webhook URL** |
 
-Fiókváltáshoz tehát elég: új `IG_ACCESS_TOKEN` + új `config/client.json`.
+Fiókváltáshoz tehát elég: új `IG_ACCESS_TOKEN` + új `NORA_CONFIG`.
+
+**Új ügyfél = új Vercel projekt, kód nélkül.** Ugyanezt a repót importálod még egyszer,
+és csak az env változókat állítod be:
+
+| Változó | Ügyfélspecifikus? |
+|---|---|
+| `NORA_CONFIG` | igen — az ő kérdőívének exportja |
+| `IG_ACCESS_TOKEN` | igen — az ő Instagram fiókjához generált token |
+| `IG_VERIFY_TOKEN`, `ADMIN_PASSWORD` | igen (külön jelszó ügyfelenként) |
+| `IG_APP_SECRET` | csak ha külön Meta appot használ |
+| `UPSTASH_*` | lehet közös is, de külön adatbázis tisztább |
+| `ANTHROPIC_API_KEY` | közös |
+
+A webhook URL az adott deploy `/api/webhook` címe lesz, és az adott app
+dashboardján kell beállítani.
 
 > **Egy apphoz csak egy Instagram fiókot kapcsolj be.** Ez single tenant MVP:
 > egy `IG_ACCESS_TOKEN`, egy `config/client.json`, és a webhook nem nézi meg az
