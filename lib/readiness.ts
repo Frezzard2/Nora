@@ -25,10 +25,16 @@ export function envGaps(): string[] {
  * Ezek nélkül az AI csak általánosságokat tud írni — éles fiókon ez kínos.
  */
 export function configGaps(c: NoraConfig): string[] {
+  // A példakonfig PLACEHOLDER szövegeket tartalmaz (ár, link). Ha valaki
+  // átírás nélkül élesíti, inkább ne válaszoljunk, mint hogy az érdeklődő
+  // megkapja a „PLACEHOLDER — írd át" szöveget.
+  const missing = (v: string) => !v.trim() || v.includes("PLACEHOLDER");
+
   const gaps: string[] = [];
-  if (!c.alapok.nev.trim() && !c.alapok.markanev.trim()) gaps.push("alapok.nev vagy markanev");
-  if (!c.alapok.kinekMibenSegit.trim()) gaps.push("alapok.kinekMibenSegit");
-  if (!c.ajanlat.foSzolgaltatas.trim()) gaps.push("ajanlat.foSzolgaltatas");
-  if (!c.ajanlat.celLink.trim()) gaps.push("ajanlat.celLink");
+  if (missing(c.alapok.nev) && missing(c.alapok.markanev)) gaps.push("alapok.nev vagy markanev");
+  if (missing(c.alapok.kinekMibenSegit)) gaps.push("alapok.kinekMibenSegit");
+  if (missing(c.ajanlat.foSzolgaltatas)) gaps.push("ajanlat.foSzolgaltatas");
+  if (missing(c.ajanlat.ar) && c.ajanlat.arElarulhato) gaps.push("ajanlat.ar");
+  if (missing(c.ajanlat.celLink)) gaps.push("ajanlat.celLink");
   return gaps;
 }

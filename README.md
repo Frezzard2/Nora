@@ -94,6 +94,11 @@ A letöltött JSON-t egy sorba tömörítve add meg `NORA_CONFIG` env változók
 jq -c . ~/Downloads/nora-config.json | pbcopy    # és beillesztés a Vercelen
 ```
 
+Kiindulásnak ott van a **`config/client.example.json`** — egy végigírt példa (DJ
+fellépés-foglalás) GYIK-kal, valódi DM-mintákkal és átadási esetekkel. Két mezőben
+`PLACEHOLDER` szöveg áll (`ajanlat.ar`, `ajanlat.celLink`): amíg ezeket nem írod át,
+a bot szándékosan nem válaszol, hogy a példaszöveg ne menjen ki érdeklődőnek.
+
 Majd **Redeploy**. (Helyi fejlesztéshez egyszerűbb a `config/client.json`-ba másolni —
 ha a `NORA_CONFIG` nincs beállítva, abból olvasunk.)
 
