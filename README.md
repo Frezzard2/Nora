@@ -158,12 +158,23 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 
 ## Másik fiókra átállítás
 
-Csak három dolog fiókspecifikus — kód nem változik:
+Nem kell új Meta app minden fiókhoz — egy app több Instagram fiókot is kezel.
+Ami mihez tartozik:
 
-1. Új Meta app az adott Instagram professional fiókhoz (3. lépés) →
-   új `IG_APP_SECRET` és `IG_ACCESS_TOKEN`.
-2. Új `config/client.json` az adott ügyfél kérdőívéből.
-3. Webhook URL újra beállítva a Meta dashboardon (4. lépés).
+| Érték | Mihez kötött |
+|---|---|
+| `IG_APP_SECRET` | az **apphoz** — fiókonként nem változik |
+| `IG_VERIFY_TOKEN` | az apphoz (te találod ki) |
+| `IG_ACCESS_TOKEN` | a **fiókhoz** — csak ez fiókspecifikus |
+| Callback URL | az apphoz: **egy app = egy webhook URL** |
+
+Fiókváltáshoz tehát elég: új `IG_ACCESS_TOKEN` + új `config/client.json`.
+
+> **Egy apphoz csak egy Instagram fiókot kapcsolj be.** Ez single tenant MVP:
+> egy `IG_ACCESS_TOKEN`, egy `config/client.json`, és a webhook nem nézi meg az
+> `entry[].id`-ból, melyik fiókra jött az üzenet. Két bekapcsolt fiók esetén a
+> másodiknak írók az első fiók nevében és hangnemén kapnának választ.
+> Két fiók élesben = két app (mert egy app egy callback URL-t tud) + két deploy.
 
 Az `IG_ACCESS_TOKEN` 60 naponta lejár — ilyenkor a napló
 `[instagram] Küldés sikertelen` sorral jelez, és a Meta dashboardon kell újat generálni.
