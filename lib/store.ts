@@ -31,6 +31,7 @@ const KEY = {
   botSwitch: "nora:bot",
   config: "nora:config",
   lastUnhandled: "nora:debug:last-unhandled",
+  lastIds: "nora:debug:last-ids",
   counter: (scope: string) => `nora:count:${scope}`,
 };
 
@@ -121,6 +122,11 @@ export async function setStoredConfig(config: unknown): Promise<void> {
  */
 export async function noteUnhandled(shape: unknown): Promise<void> {
   await db().set(KEY.lastUnhandled, { at: new Date().toISOString(), shape }, { ex: 60 * 60 * 24 });
+}
+
+/** Hibakereséshez: a legutóbbi esemény opak azonosítói, tartalom nélkül. */
+export async function noteIds(ids: unknown): Promise<void> {
+  await db().set(KEY.lastIds, { at: new Date().toISOString(), ids }, { ex: 60 * 60 * 24 });
 }
 
 export async function getUnhandled<T>(): Promise<T | null> {

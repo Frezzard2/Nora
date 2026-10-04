@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
-import { firstDelivery, noteUnhandled } from "@/lib/store";
+import { firstDelivery, noteIds, noteUnhandled } from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -22,9 +22,12 @@ export async function GET(req: Request) {
 
 type MessagingEvent = {
   sender?: { id?: string };
+  recipient?: { id?: string };
   message?: { mid?: string; text?: string; is_echo?: boolean };
 };
 type Entry = {
+  /** annak a fióknak az azonosítója, amelyre az esemény érkezett */
+  id?: string;
   messaging?: MessagingEvent[];
   /** a Meta dashboard „Send to Server" tesztje ebben az alakban küld */
   changes?: { field?: string; value?: MessagingEvent }[];
@@ -98,7 +101,19 @@ async function process_(payload: Payload) {
 
       // a saját visszhangzó üzenetünk — nélküle a bot magának válaszolna
       if (msg.is_echo) {
-        console.info("[webhook] Saját visszhangzó üzenet, kihagyva.");
+        console.info("[webhook] Saját visszhangzó üzenet (is_echo), kihagyva.");
+        continue;
+      }
+
+      /**
+       * A gyakorlatban a Meta is_echo nélkül is visszaküldi a saját kimenő
+       * üzenetünket: ilyenkor a küldő annak a fióknak az azonosítója, amelyre
+       * az esemény érkezett. Enélkül a bot a saját válaszára válaszolt.
+       * Csak akkor szűrünk, ha egyeznek — ha az entry.id hiányzik vagy más
+       * alakú, inkább feldolgozzuk, mint hogy minden üzenetet eldobjunk.
+       */
+      if (entry.id && senderId === entry.id) {
+        console.info("[webhook] Saját kimenő üzenet (küldő = a fiók), kihagyva.");
         continue;
       }
 
@@ -108,6 +123,9 @@ async function process_(payload: Payload) {
         console.info(`[webhook] Nem szöveges üzenet ${senderId}-től, kihagyva.`);
         continue;
       }
+
+      // csak opak azonosítók, üzenet-tartalom nélkül — a szűrés finomításához
+      await noteIds({ entry: entry.id, sender: senderId, recipient: event.recipient?.id });
 
       if (!(await firstDelivery(msg.mid))) {
         console.info(`[webhook] Már feldolgozott üzenet (${msg.mid}), kihagyva.`);
