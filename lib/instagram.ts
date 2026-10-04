@@ -19,7 +19,8 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
     return;
   }
 
-  for (const part of chunk(text)) {
+  const parts = chunk(text);
+  for (const [i, part] of parts.entries()) {
     // óránkénti globális korlát: a számláló a futó UTC-órához tartozik
     const hour = new Date().toISOString().slice(0, 13);
     if ((await bump(`send:${hour}`, 3600)) > HOURLY_LIMIT) {
@@ -47,6 +48,10 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
         );
         return;
       }
+
+      console.info(
+        `[instagram] Elküldve ${i + 1}/${parts.length} (${part.length} karakter) → ${recipientId}`,
+      );
     } catch (err) {
       console.error(
         "[instagram] Hálózati hiba küldéskor:",

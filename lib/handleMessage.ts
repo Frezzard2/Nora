@@ -31,8 +31,18 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
     lastActivity: Date.now(),
   }));
 
-  if (conv.handedOff) return;
-  if (!conv.botEnabled) return;
+  // Az üzenet tartalma nem megy naplóba — a Vercel logja egy harmadik hely lenne,
+  // ahol az ügyfél szövege landol. Ami a hibakereséshez kell, az a hossz és a sorsa.
+  console.info(`[nora] ← ${senderId}: ${text.length} karakter`);
+
+  if (conv.handedOff) {
+    console.info(`[nora] ${senderId}: embernek átadva, a bot hallgat.`);
+    return;
+  }
+  if (!conv.botEnabled) {
+    console.info(`[nora] ${senderId}: a bot ezen a beszélgetésen ki van kapcsolva.`);
+    return;
+  }
 
   // Kitöltetlen konfiggal az AI csak általánosságokat írna. Éles fiókon inkább
   // ne válaszoljunk: az üzenet tárolva van, az admin felületen látszik.
@@ -65,7 +75,16 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
   }
 
   const body = reply.text.trim() || (reply.handover ? HANDOVER_FALLBACK : "");
-  if (body) await sendMessage(senderId, body);
+  if (body) {
+    console.info(
+      `[nora] → ${senderId}: ${body.length} karakter${reply.handover ? ", ÁTADÁS embernek" : ""}` +
+        ` · ${reply.usage?.inputTokens ?? 0}+${reply.usage?.outputTokens ?? 0} token` +
+        ` · $${(reply.usage?.costUsd ?? 0).toFixed(4)}`,
+    );
+    await sendMessage(senderId, body);
+  } else {
+    console.warn(`[nora] ${senderId}: az AI üres választ adott, nem küldünk semmit.`);
+  }
 
   await update(senderId, (c) => ({
     ...c,

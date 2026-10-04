@@ -56,13 +56,22 @@ async function process_(payload: Payload) {
       if (!msg || !senderId) continue;
 
       // a saját visszhangzó üzenetünk — nélküle a bot magának válaszolna
-      if (msg.is_echo) continue;
+      if (msg.is_echo) {
+        console.info("[webhook] Saját visszhangzó üzenet, kihagyva.");
+        continue;
+      }
 
       const text = msg.text?.trim();
       // ponytail: csak szöveget kezelünk; kép/hang/sticker esetén nincs válasz
-      if (!text || !msg.mid) continue;
+      if (!text || !msg.mid) {
+        console.info(`[webhook] Nem szöveges üzenet ${senderId}-től, kihagyva.`);
+        continue;
+      }
 
-      if (!(await firstDelivery(msg.mid))) continue;
+      if (!(await firstDelivery(msg.mid))) {
+        console.info(`[webhook] Már feldolgozott üzenet (${msg.mid}), kihagyva.`);
+        continue;
+      }
 
       try {
         await handleMessage(senderId, text);
