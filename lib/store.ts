@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
 /**
@@ -32,6 +33,8 @@ const KEY = {
   config: "nora:config",
   lastUnhandled: "nora:debug:last-unhandled",
   lastIds: "nora:debug:last-ids",
+  sent: (hash: string) => `nora:sent:${hash}`,
+  selfIds: "nora:self-ids",
   counter: (scope: string) => `nora:count:${scope}`,
 };
 
@@ -122,6 +125,39 @@ export async function setStoredConfig(config: unknown): Promise<void> {
  */
 export async function noteUnhandled(shape: unknown): Promise<void> {
   await db().set(KEY.lastUnhandled, { at: new Date().toISOString(), shape }, { ex: 60 * 60 * 24 });
+}
+
+/**
+ * A kimenő üzenetek visszhangjának felismerése.
+ *
+ * A Meta a saját kimenő üzenetünket bejövőként is visszaküldi, is_echo jelzés
+ * nélkül, és az azonosítók alapján nem különböztethető meg egy igazi üzenettől
+ * (a küldő a bot saját, app-hoz kötött azonosítója, a címzett pedig a fiók).
+ * Ezért amit kiküldünk, azt feljegyezzük, és ha ugyanaz jön vissza, kiszűrjük.
+ *
+ * ponytail: 15 perces ablak és szó szerinti egyezés. Ha egy érdeklődő pont
+ * ugyanazt a szöveget írja be ennyi időn belül, azt az egy üzenetet elhagyjuk.
+ * A visszhangból megtanult küldő-azonosító viszont lejárat nélkül szűr.
+ */
+const SENT_TTL = 15 * 60;
+
+const hash = (text: string) => createHash("sha1").update(text.trim()).digest("hex").slice(0, 16);
+
+export async function rememberSent(text: string): Promise<void> {
+  await db().set(KEY.sent(hash(text)), 1, { ex: SENT_TTL });
+}
+
+export async function wasSentByUs(text: string): Promise<boolean> {
+  return (await db().exists(KEY.sent(hash(text)))) === 1;
+}
+
+/** A visszhangból megtanult saját küldő-azonosító — innentől azonnal szűrhető. */
+export async function markSelfId(id: string): Promise<void> {
+  await db().sadd(KEY.selfIds, id);
+}
+
+export async function isSelfId(id: string): Promise<boolean> {
+  return (await db().sismember(KEY.selfIds, id)) === 1;
 }
 
 /** Hibakereséshez: a legutóbbi esemény opak azonosítói, tartalom nélkül. */

@@ -1,6 +1,6 @@
 import "server-only";
 import { chunk } from "./chunk.ts";
-import { bump } from "./store.ts";
+import { bump, rememberSent } from "./store.ts";
 
 /** A Graph API verziója — egyetlen helyen. */
 export const GRAPH_VERSION = "v23.0";
@@ -29,6 +29,9 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
       );
       return;
     }
+
+    // a visszhang akár a küldés válasza előtt megérkezhet, ezért előbb jegyezzük fel
+    await rememberSent(part);
 
     try {
       const res = await fetch(ENDPOINT, {

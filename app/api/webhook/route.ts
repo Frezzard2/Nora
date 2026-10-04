@@ -1,7 +1,14 @@
 import { after } from "next/server";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
-import { firstDelivery, noteIds, noteUnhandled } from "@/lib/store";
+import {
+  firstDelivery,
+  isSelfId,
+  markSelfId,
+  noteIds,
+  noteUnhandled,
+  wasSentByUs,
+} from "@/lib/store";
 
 export const runtime = "nodejs";
 
@@ -105,15 +112,9 @@ async function process_(payload: Payload) {
         continue;
       }
 
-      /**
-       * A gyakorlatban a Meta is_echo nélkül is visszaküldi a saját kimenő
-       * üzenetünket: ilyenkor a küldő annak a fióknak az azonosítója, amelyre
-       * az esemény érkezett. Enélkül a bot a saját válaszára válaszolt.
-       * Csak akkor szűrünk, ha egyeznek — ha az entry.id hiányzik vagy más
-       * alakú, inkább feldolgozzuk, mint hogy minden üzenetet eldobjunk.
-       */
-      if (entry.id && senderId === entry.id) {
-        console.info("[webhook] Saját kimenő üzenet (küldő = a fiók), kihagyva.");
+      // a visszhangból korábban megtanult saját küldő-azonosító
+      if (await isSelfId(senderId)) {
+        console.info("[webhook] Saját kimenő üzenet (ismert küldő-azonosító), kihagyva.");
         continue;
       }
 
@@ -121,6 +122,18 @@ async function process_(payload: Payload) {
       // ponytail: csak szöveget kezelünk; kép/hang/sticker esetén nincs válasz
       if (!text || !msg.mid) {
         console.info(`[webhook] Nem szöveges üzenet ${senderId}-től, kihagyva.`);
+        continue;
+      }
+
+      /**
+       * A Meta is_echo nélkül is visszaküldi a kimenő üzenetünket, és az
+       * azonosítók alapján nem különböztethető meg egy igazi üzenettől. Amit
+       * viszont épp mi küldtünk ki, azt felismerjük a szövegéről — és a küldő
+       * azonosítóját eltároljuk, hogy a következő visszhangot már az alapján szűrjük.
+       */
+      if (await wasSentByUs(text)) {
+        await markSelfId(senderId);
+        console.info("[webhook] Saját kimenő üzenet (egyező szöveg), kihagyva. A küldő-azonosító megjegyezve.");
         continue;
       }
 
