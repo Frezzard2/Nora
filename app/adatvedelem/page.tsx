@@ -53,8 +53,8 @@ const SECTIONS = [
   {
     h: "Kapcsolat",
     p: [
-      "Adatkezelő: (ide írd a cég/egyéni vállalkozó nevét és székhelyét).",
-      "E-mail: (ide írd a kapcsolattartási e-mail címet).",
+      "Adatkezelő: Kukucska Zsombor (Magyarország).",
+      "E-mail: kukucska.zsombor@gmail.com",
     ],
   },
 ];
