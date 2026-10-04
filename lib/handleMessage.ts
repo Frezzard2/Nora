@@ -42,7 +42,7 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
 
   // Kitöltetlen konfiggal az AI csak általánosságokat írna. Éles fiókon inkább
   // ne válaszoljunk: az üzenet tárolva van, az admin felületen látszik.
-  const { config, source } = clientConfig();
+  const { config, source } = await clientConfig();
   const gaps = configGaps(config);
   if (gaps.length) {
     console.error(

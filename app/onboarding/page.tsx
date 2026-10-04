@@ -53,13 +53,54 @@ export default function Onboarding() {
   const [config, setConfig] = useState<NoraConfig>(emptyConfig);
   const [step, setStep] = useState(0);
   const [ready, setReady] = useState(false);
+  const [live, setLive] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [liveNote, setLiveNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = loadConfig();
-    if (saved) setConfig(mergeConfig(saved));
-    setReady(true);
+    // Az élesben futó konfiguráció nyer a böngészőben tárolt piszkozat felett —
+    // így azt szerkesztjük, ami tényleg válaszol az érdeklődőknek.
+    (async () => {
+      try {
+        const res = await fetch("/api/config");
+        const body = (await res.json()) as { config: NoraConfig | null };
+        if (body.config) {
+          setConfig(mergeConfig(body.config));
+          setReady(true);
+          return;
+        }
+      } catch {
+        /* nincs hálózat vagy nincs mentve semmi — a böngészőbeli piszkozattal folytatjuk */
+      }
+      const saved = loadConfig();
+      if (saved) setConfig(mergeConfig(saved));
+      setReady(true);
+    })();
   }, []);
+
+  async function publish() {
+    setLive("saving");
+    setLiveNote(null);
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      const body = (await res.json()) as { ok?: boolean; gaps?: string[]; error?: string };
+      if (!res.ok || !body.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+
+      setLive("saved");
+      setLiveNote(
+        body.gaps?.length
+          ? `Mentve, de a bot még nem válaszol — hiányzik: ${body.gaps.join(", ")}`
+          : "Mentve. A bot a következő üzenetnél már ezzel válaszol.",
+      );
+    } catch (err) {
+      setLive("error");
+      setLiveNote(err instanceof Error ? err.message : "Nem sikerült menteni.");
+    }
+  }
 
   useEffect(() => {
     if (ready) saveConfig(config);
@@ -639,12 +680,34 @@ export default function Onboarding() {
                     {step === SECTIONS.length - 1 ? "Konfiguráció létrehozása" : "Tovább"}
                   </button>
                 ) : (
-                  <Link href="/simulator" className="btn-primary">
-                    Tovább a szimulátorra
-                  </Link>
+                  <>
+                    <Link href="/simulator" className="btn-ghost">
+                      Szimulátor
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={publish}
+                      disabled={live === "saving"}
+                    >
+                      {live === "saving" ? "Mentés…" : "Élesítés"}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
+
+            {liveNote && (
+              <p
+                className={`mt-4 rounded-[10px] border px-4 py-3 text-[15px] leading-relaxed ${
+                  live === "error"
+                    ? "border-brick/30 bg-brick-soft text-brick"
+                    : "border-green-line bg-green-soft text-green-dark"
+                }`}
+              >
+                {liveNote}
+              </p>
+            )}
           </div>
         </main>
       </div>

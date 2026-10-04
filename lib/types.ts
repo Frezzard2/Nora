@@ -66,3 +66,20 @@ export const emptyConfig = (): NoraConfig => ({
   hatarok: { atadasEsetei: [...ATADAS_ALAP], sohaNeMondja: "", fallbackMondat: "" },
   inditok: { forrasok: [], kampanyKulcsszo: "" },
 });
+
+/** Importált JSON-t összefésüli az üres alapértelmezéssel, hogy hiányzó mező ne dobjon hibát. */
+export function mergeConfig(input: unknown): NoraConfig {
+  const base = emptyConfig();
+  if (typeof input !== "object" || input === null) return base;
+  const src = input as Record<string, unknown>;
+
+  for (const key of Object.keys(base) as (keyof NoraConfig)[]) {
+    const value = src[key];
+    if (Array.isArray(base[key])) {
+      if (Array.isArray(value)) base[key] = value as never;
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      base[key] = { ...base[key], ...value } as never;
+    }
+  }
+  return base;
+}

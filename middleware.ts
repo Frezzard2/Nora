@@ -1,7 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-/** HTTP Basic: nem kifinomult, de az /admin nem nyilvános. */
-export const config = { matcher: "/admin/:path*" };
+/**
+ * HTTP Basic a nem nyilvános felületek előtt.
+ *
+ * Nyilvános marad: a főoldal, az /adatvedelem (a Meta app publikálásához kell)
+ * és az /api/webhook (a Meta hívja, saját aláírás-ellenőrzéssel).
+ *
+ * Az /api/reply és a /simulator azért van bent, mert fizetett AI-hívást
+ * indítanak — nyilvános deployon enélkül bárki égethetné a kvótát.
+ */
+export const config = {
+  matcher: ["/admin/:path*", "/onboarding/:path*", "/simulator/:path*", "/api/config", "/api/reply"],
+};
 
 const challenge = () =>
   new NextResponse("Bejelentkezés szükséges.", {

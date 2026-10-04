@@ -12,9 +12,9 @@ export const metadata = { title: "Nora — admin" };
 const lastText = (c: Conversation) => c.messages.at(-1)?.text ?? "(még nincs üzenet)";
 
 /** Üzembe állítási figyelmeztetés — ebből látszik, mi hiányzik még. */
-function Setup() {
+async function Setup() {
   const env = envGaps();
-  const resolved = clientConfig();
+  const resolved = await clientConfig();
   const config = configGaps(resolved.config);
   if (!env.length && !config.length && !resolved.error) return null;
 
@@ -31,7 +31,7 @@ function Setup() {
         <p className="mt-1.5">
           Hiányzó mező a konfigurációban (forrás:{" "}
           <code className="font-semibold">
-            {resolved.source === "env" ? "NORA_CONFIG" : "config/client.json"}
+            {resolved.source}
           </code>
           ): <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a
           bot tárolja az üzeneteket, de nem válaszol.
@@ -44,11 +44,15 @@ function Setup() {
 export default async function Admin() {
   const [conversations, globalOn] = await Promise.all([listConversations(), isBotEnabled()]);
   const totalCost = conversations.reduce((sum, c) => sum + c.costUsd, 0);
-  const { source } = clientConfig();
+  const { source } = await clientConfig();
 
   return (
     <>
-      <TopBar tag="Admin" />
+      <TopBar tag="Admin">
+        <Link href="/onboarding" className="btn-quiet">
+          Konfiguráció szerkesztése
+        </Link>
+      </TopBar>
 
       <main className="mx-auto max-w-[1100px] px-4 py-10 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -57,7 +61,7 @@ export default async function Admin() {
             <p className="mt-2 text-[15px] text-muted">
               {conversations.length} beszélgetés · összesített AI-költség{" "}
               <strong className="text-ink">{money(totalCost)}</strong> · konfiguráció:{" "}
-              <code>{source === "env" ? "NORA_CONFIG" : "config/client.json"}</code>
+              <code>{source}</code>
             </p>
           </div>
 

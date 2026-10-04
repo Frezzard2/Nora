@@ -12,12 +12,20 @@ npm run dev
 npm run check                  # a logikai önellenőrzések
 ```
 
-A konfigurációt az `/onboarding` varázslóval állítod össze, exportálod JSON-ba, és
-a tartalmát bemásolod a **`config/client.json`** fájlba. Ebből dolgozik az élő bot.
+A konfigurációt az `/onboarding` varázslóval állítod össze, és a végén az **Élesítés**
+gombbal mented. Onnantól a bot azzal válaszol — nincs commit, nincs env változó,
+nincs redeploy. Újra megnyitva a varázsló az élesben futó konfigurációt tölti be,
+szóval szerkeszteni is ott tudod.
 
-Éles üzemben viszont jobb a **`NORA_CONFIG` env változó** (ugyanaz a JSON, egy sorban) —
-akkor a repóhoz új ügyfélnél nem kell hozzányúlni. Ha be van állítva, ez nyer a fájl
-felett; az `/admin` fejléce mindig kiírja, melyikből fut.
+Három forrás van, ebben a sorrendben:
+
+| Forrás | Mikor |
+|---|---|
+| **felület** (Élesítés gomb → Redis) | ha használták — ez nyer |
+| **`NORA_CONFIG`** env változó (a JSON egy sorban) | ha a felületet nem használják |
+| **`config/client.json`** | helyi fejlesztéshez |
+
+Az `/admin` fejléce mindig kiírja, melyikből fut éppen.
 
 > **Amíg a konfiguráció nincs kitöltve, a bot nem válaszol** — az üzeneteket eltárolja, és az
 > `/admin` oldal felül megmutatja, melyik mező hiányzik. Ez szándékos: éles fiókon
@@ -27,8 +35,8 @@ felett; az `/admin` fejléce mindig kiírja, melyikből fut.
 
 | Útvonal | Mi ez |
 |---|---|
-| `/onboarding` | Beállító varázsló (localStorage + JSON export) |
-| `/simulator` | Teszt-chat, nem küld valódi üzenetet |
+| `/onboarding` | Beállító varázsló + **Élesítés** — jelszóval védve |
+| `/simulator` | Teszt-chat, nem küld valódi üzenetet — jelszóval védve |
 | `/admin` | Beszélgetések, kapcsolók, költség — jelszóval védve |
 | `/adatvedelem` | Adatvédelmi tájékoztató (a Meta app publikálásához kell) |
 | `/api/webhook` | A Meta ide küldi az Instagram eseményeket |
@@ -168,6 +176,11 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 - Globális vészkapcsoló az `/admin` felületen — azonnal elhallgattatja a botot.
 - Duplikált kézbesítés szűrése `message.mid` alapján, 24 órás lejárattal.
 - Titkok csak szerveroldalon: nincs `NEXT_PUBLIC_` kulcs, a `.env.local` nincs a repóban.
+- Jelszó mögött: `/admin`, `/onboarding`, `/simulator`, `/api/config`, `/api/reply`.
+  Az utolsó kettő azért, mert fizetett AI-hívást indítanak — nyilvános deployon
+  enélkül bárki égethetné a kvótát.
+- Nyilvános: a főoldal, az `/adatvedelem` (a Meta app publikálásához kell) és az
+  `/api/webhook` (a Meta hívja, saját aláírás-ellenőrzéssel).
 - Az admin kapcsolók csak már létező beszélgetést módosítanak (hamisított POST nem
   tud szemét rekordot írni a tárolóba).
 - Kitöltetlen konfigurációval a bot nem válaszol.
@@ -184,14 +197,15 @@ Ami mihez tartozik:
 | `IG_ACCESS_TOKEN` | a **fiókhoz** — csak ez fiókspecifikus |
 | Callback URL | az apphoz: **egy app = egy webhook URL** |
 
-Fiókváltáshoz tehát elég: új `IG_ACCESS_TOKEN` + új `NORA_CONFIG`.
+Fiókváltáshoz tehát elég: új `IG_ACCESS_TOKEN`, és a konfigurációt az új deploy
+`/onboarding`-ján élesíteni.
 
 **Új ügyfél = új Vercel projekt, kód nélkül.** Ugyanezt a repót importálod még egyszer,
 és csak az env változókat állítod be:
 
 | Változó | Ügyfélspecifikus? |
 |---|---|
-| `NORA_CONFIG` | igen — az ő kérdőívének exportja |
+| `NORA_CONFIG` | nem kell, ha a felületen élesítenek — csak tartalék |
 | `IG_ACCESS_TOKEN` | igen — az ő Instagram fiókjához generált token |
 | `IG_VERIFY_TOKEN`, `ADMIN_PASSWORD` | igen (külön jelszó ügyfelenként) |
 | `IG_APP_SECRET` | csak ha külön Meta appot használ |

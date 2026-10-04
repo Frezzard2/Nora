@@ -29,6 +29,7 @@ const KEY = {
   index: "nora:convs",
   seen: (mid: string) => `nora:seen:${mid}`,
   botSwitch: "nora:bot",
+  config: "nora:config",
   counter: (scope: string) => `nora:count:${scope}`,
 };
 
@@ -100,6 +101,16 @@ export async function isBotEnabled(): Promise<boolean> {
 
 export async function setBotEnabled(on: boolean): Promise<void> {
   await db().set(KEY.botSwitch, on ? "on" : "off");
+}
+
+/** A felületről mentett konfiguráció, ha van. */
+export async function getStoredConfig<T>(): Promise<T | null> {
+  return await db().get<T>(KEY.config);
+}
+
+/** A varázslóból mentett konfiguráció. Ez nyer az env változó és a fájl felett. */
+export async function setStoredConfig(config: unknown): Promise<void> {
+  await db().set(KEY.config, config);
 }
 
 /** Lejáró számláló (napi/óránkénti korlátokhoz). A számláló új értékét adja. */
