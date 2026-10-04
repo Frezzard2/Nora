@@ -24,7 +24,25 @@ type MessagingEvent = {
   sender?: { id?: string };
   message?: { mid?: string; text?: string; is_echo?: boolean };
 };
-type Payload = { entry?: { messaging?: MessagingEvent[] }[] };
+type Entry = {
+  messaging?: MessagingEvent[];
+  /** a Meta dashboard „Send to Server" tesztje ebben az alakban küld */
+  changes?: { field?: string; value?: MessagingEvent }[];
+};
+type Payload = { entry?: Entry[] };
+
+/**
+ * A valódi Instagram-üzenetek az `entry[].messaging` tömbben jönnek, a Meta
+ * dashboard teszt-gombja viszont `entry[].changes[].value` alakban. Mindkettőt
+ * kezeljük, különben a dashboard tesztje csendben semmit nem csinál.
+ */
+function eventsOf(entry: Entry): MessagingEvent[] {
+  const fromChanges = (entry.changes ?? [])
+    .filter((c) => c.field === "messages" && c.value)
+    .map((c) => c.value as MessagingEvent);
+
+  return [...(entry.messaging ?? []), ...fromChanges];
+}
 
 export async function POST(req: Request) {
   // a HMAC a nyers bytes-okon számol, ezért itt még nem parse-olunk
@@ -50,7 +68,10 @@ export async function POST(req: Request) {
 async function process_(payload: Payload) {
   // egy payloadban több entry, egy entryben több esemény is lehet
   for (const entry of payload.entry ?? []) {
-    for (const event of entry.messaging ?? []) {
+    const events = eventsOf(entry);
+    if (!events.length) console.info("[webhook] Entry feldolgozható esemény nélkül, kihagyva.");
+
+    for (const event of events) {
       const msg = event.message;
       const senderId = event.sender?.id;
       if (!msg || !senderId) continue;
