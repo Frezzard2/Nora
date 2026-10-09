@@ -2,6 +2,7 @@ import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import { clientConfig } from "@/lib/clientConfig";
 import { configGaps, envGaps } from "@/lib/readiness";
+import { getEntryIds } from "@/lib/store";
 import { isBotEnabled, listConversations, type Conversation } from "@/lib/store";
 import { toggleConversation, toggleGlobal } from "./actions";
 import { State, money, when } from "./ui";
@@ -16,7 +17,14 @@ async function Setup() {
   const env = envGaps();
   const resolved = await clientConfig();
   const config = configGaps(resolved.config);
-  if (!env.length && !config.length && !resolved.error) return null;
+
+  // Egy apphoz több Instagram fiók is köthető; ilyenkor mindegyik eseménye
+  // ide jön, de válaszolni csak a tokenünkhöz tartozó fiókban tudunk.
+  const own = process.env.IG_ACCOUNT_ID?.trim();
+  const seen = await getEntryIds();
+  const extraAccounts = !own && seen.length > 1 ? seen : [];
+
+  if (!env.length && !config.length && !resolved.error && !extraAccounts.length) return null;
 
   return (
     <div className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3.5 text-[15px] leading-relaxed text-brick">
@@ -27,6 +35,16 @@ async function Setup() {
         </p>
       )}
       {resolved.error && <p className="mt-1.5">{resolved.error}</p>}
+      {extraAccounts.length > 0 && (
+        <p className="mt-1.5">
+          Több Instagram fiók üzenetei érkeznek ide (<code className="font-semibold">
+            {extraAccounts.join(", ")}
+          </code>
+          ). Válaszolni csak ahhoz tudunk, amelyikhez a token tartozik — a többinél az AI-hívás
+          kifizetődik, de a válasz nem megy ki. Állítsd be az{" "}
+          <code className="font-semibold">IG_ACCOUNT_ID</code> env változót a sajátodra.
+        </p>
+      )}
       {config.length > 0 && (
         <p className="mt-1.5">
           Hiányzó mező a konfigurációban (forrás:{" "}

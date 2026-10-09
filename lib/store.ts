@@ -35,6 +35,7 @@ const KEY = {
   lastIds: "nora:debug:last-ids",
   sent: (hash: string) => `nora:sent:${hash}`,
   selfIds: "nora:self-ids",
+  entryIds: "nora:debug:entry-ids",
   counter: (scope: string) => `nora:count:${scope}`,
 };
 
@@ -158,6 +159,19 @@ export async function markSelfId(id: string): Promise<void> {
 
 export async function isSelfId(id: string): Promise<boolean> {
   return (await db().sismember(KEY.selfIds, id)) === 1;
+}
+
+/**
+ * Hibakereséshez: mely fiókokra érkeztek eddig események. Egy apphoz több
+ * Instagram fiók is köthető, és ebből derül ki, melyik az, amelyikhez a
+ * tokenünk tartozik (IG_ACCOUNT_ID).
+ */
+export async function noteEntryId(id: string): Promise<void> {
+  await db().sadd(KEY.entryIds, id);
+}
+
+export async function getEntryIds(): Promise<string[]> {
+  return await db().smembers(KEY.entryIds);
 }
 
 /** Hibakereséshez: a legutóbbi esemény opak azonosítói, tartalom nélkül. */

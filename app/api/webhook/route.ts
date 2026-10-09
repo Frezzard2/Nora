@@ -5,6 +5,7 @@ import {
   firstDelivery,
   isSelfId,
   markSelfId,
+  noteEntryId,
   noteIds,
   noteUnhandled,
   wasSentByUs,
@@ -92,8 +93,23 @@ export async function POST(req: Request) {
 }
 
 async function process_(payload: Payload) {
+  /**
+   * Egy Meta apphoz több Instagram fiók is köthető, és akkor mindegyik
+   * eseménye ugyanerre a webhookra jön. Nekünk egy tokenünk van, ezért a
+   * másik fiók üzeneteire hiába generálnánk választ: a küldés elhasalna,
+   * az AI-hívást viszont kifizetnénk. Ezért csak a sajátunkat dolgozzuk fel.
+   */
+  const ownAccount = process.env.IG_ACCOUNT_ID?.trim();
+
   // egy payloadban több entry, egy entryben több esemény is lehet
   for (const entry of payload.entry ?? []) {
+    if (entry.id) await noteEntryId(entry.id);
+
+    if (ownAccount && entry.id && entry.id !== ownAccount) {
+      console.info(`[webhook] Másik fiók eseménye (${entry.id}), kihagyva.`);
+      continue;
+    }
+
     const events = eventsOf(entry);
     if (!events.length) {
       const shape = shapeOf(entry);

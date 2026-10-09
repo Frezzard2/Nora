@@ -216,10 +216,16 @@ A webhook URL az adott deploy `/api/webhook` címe lesz, és az adott app
 dashboardján kell beállítani.
 
 > **Egy apphoz csak egy Instagram fiókot kapcsolj be.** Ez single tenant MVP:
-> egy `IG_ACCESS_TOKEN`, egy `config/client.json`, és a webhook nem nézi meg az
-> `entry[].id`-ból, melyik fiókra jött az üzenet. Két bekapcsolt fiók esetén a
-> másodiknak írók az első fiók nevében és hangnemén kapnának választ.
+> egy `IG_ACCESS_TOKEN`, egy konfiguráció. Két bekapcsolt fiók esetén mindkettő
+> üzenete ide jön, de válaszolni csak a tokenhez tartozó fiókban tudunk — a
+> másiknál az AI-hívás kifizetődik, a válasz viszont elhasal.
 > Két fiók élesben = két app (mert egy app egy callback URL-t tud) + két deploy.
+>
+> Védelemként állítsd be az **`IG_ACCOUNT_ID`** env változót a saját fiók
+> webhook-azonosítójára: a többi fiók eseményeit a webhook eldobja, AI-hívás
+> nélkül. Az értéket az `/admin` figyelmeztető sávja mutatja meg, ha több fiók
+> érkezik. Ha rosszul állítod be, a bot egyáltalán nem válaszol (biztonságos
+> irányba hibázik), és a napló kiírja a tényleges azonosítót.
 
 Az `IG_ACCESS_TOKEN` 60 naponta lejár — ilyenkor a napló
 `[instagram] Küldés sikertelen` sorral jelez, és a Meta dashboardon kell újat generálni.
