@@ -1,140 +1,254 @@
 import Link from "next/link";
-import TopBar from "@/components/TopBar";
+import { currentRole } from "@/lib/auth";
 import { clientConfig } from "@/lib/clientConfig";
+import { fetchOwnAccount } from "@/lib/instagram";
 import { configGaps, envGaps } from "@/lib/readiness";
-import { getEntryIds } from "@/lib/store";
-import { isBotEnabled, listConversations, type Conversation } from "@/lib/store";
-import { toggleConversation, toggleGlobal } from "./actions";
-import { State, money, when } from "./ui";
+import { duration, overview } from "@/lib/stats";
+import { costSoFar, getEntryIds, getUnhandled, isBotEnabled, listConversations } from "@/lib/store";
+import { resetAccountIds, toggleGlobal } from "./actions";
+import { Empty, FromComment, Ignored, Notice, Stat, State, convName, money, when } from "./ui";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Nora — admin" };
 
-const lastText = (c: Conversation) => c.messages.at(-1)?.text ?? "(még nincs üzenet)";
+/**
+ * A legutóbbi feldolgozhatatlan webhook-esemény SZERKEZETE (kulcsok és típusok,
+ * tartalom nélkül). Ebből derül ki, ha a Meta más mezőneveket küld, mint amit a
+ * kód vár — tipikusan komment-eseménynél. Egy nap után magától eltűnik.
+ */
+async function Unhandled() {
+  const last = await getUnhandled<{ at: string; shape: unknown }>();
+  if (!last) return null;
 
-/** Üzembe állítási figyelmeztetés — ebből látszik, mi hiányzik még. */
+  return (
+    <div className="mt-4">
+      <Notice kind="warn">
+        <strong className="font-semibold">Feldolgozhatatlan webhook-esemény.</strong>
+        <p className="mt-1.5">
+          Érkezett egy esemény, amiből hiányoztak a várt mezők ({when(Date.parse(last.at))}). Ha
+          komment-tesztet futtattál, valószínűleg más mezőnevet küldött a Meta. A tartalom nincs
+          eltárolva, csak a szerkezet:
+        </p>
+        <pre className="mt-2 overflow-auto rounded-[8px] border border-brick/20 bg-card/60 p-3 text-[13px] leading-relaxed">
+          {JSON.stringify(last.shape, null, 2)}
+        </pre>
+        <p className="mt-2 text-[13px]">Ez a jelzés egy nap után magától eltűnik.</p>
+      </Notice>
+    </div>
+  );
+}
+
+/** Üzembe állítási figyelmeztetés — technikai, ezért csak a tulajdonosnak. */
 async function Setup() {
   const env = envGaps();
   const resolved = await clientConfig();
   const config = configGaps(resolved.config);
 
-  // Egy apphoz több Instagram fiók is köthető; ilyenkor mindegyik eseménye
-  // ide jön, de válaszolni csak a tokenünkhöz tartozó fiókban tudunk.
+  /**
+   * Egy apphoz több Instagram fiók is köthető, és akkor MINDEGYIK eseménye ide
+   * jön. Válaszolni csak a tokenünkhöz tartozó fiókban tudunk, a többinél az
+   * AI-hívás kifizetődik, a válasz viszont nem megy ki — a magánbeszélgetéseid
+   * pedig bekerülnek a tárolóba.
+   *
+   * Ezért már EGYETLEN rögzítetlen fióknál is szólunk, nem csak kettőnél: ha a
+   * webhook nem a saját fiókodra érkezik, az egy fiókkal is baj, és pont azt
+   * nem vennéd észre.
+   */
   const own = process.env.IG_ACCOUNT_ID?.trim();
   const seen = await getEntryIds();
-  const extraAccounts = !own && seen.length > 1 ? seen : [];
+  const unpinned = !own && seen.length > 0 ? seen : [];
+  const account = unpinned.length ? await fetchOwnAccount() : null;
 
-  if (!env.length && !config.length && !resolved.error && !extraAccounts.length) return null;
+  if (!env.length && !config.length && !resolved.error && !unpinned.length) return null;
 
   return (
-    <div className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3.5 text-[15px] leading-relaxed text-brick">
-      <strong className="font-semibold">A beállítás még nincs kész.</strong>
-      {env.length > 0 && (
-        <p className="mt-1.5">
-          Hiányzó környezeti változó: <code className="font-semibold">{env.join(", ")}</code>
-        </p>
-      )}
-      {resolved.error && <p className="mt-1.5">{resolved.error}</p>}
-      {extraAccounts.length > 0 && (
-        <p className="mt-1.5">
-          Több Instagram fiók üzenetei érkeznek ide (<code className="font-semibold">
-            {extraAccounts.join(", ")}
-          </code>
-          ). Válaszolni csak ahhoz tudunk, amelyikhez a token tartozik — a többinél az AI-hívás
-          kifizetődik, de a válasz nem megy ki. Állítsd be az{" "}
-          <code className="font-semibold">IG_ACCOUNT_ID</code> env változót a sajátodra.
-        </p>
-      )}
-      {config.length > 0 && (
-        <p className="mt-1.5">
-          Hiányzó mező a konfigurációban (forrás:{" "}
-          <code className="font-semibold">
-            {resolved.source}
-          </code>
-          ): <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a
-          bot tárolja az üzeneteket, de nem válaszol.
-        </p>
-      )}
+    <div className="mt-6">
+      <Notice kind="warn">
+        <strong className="font-semibold">A beállítás még nincs kész.</strong>
+        {env.length > 0 && (
+          <p className="mt-1.5">
+            Hiányzó környezeti változó: <code className="font-semibold">{env.join(", ")}</code>
+          </p>
+        )}
+        {resolved.error && <p className="mt-1.5">{resolved.error}</p>}
+        {unpinned.length > 0 && (
+          <p className="mt-1.5">
+            Nincs fiókhoz kötve a feldolgozás. Eddig ezekre a fiókokra érkezett webhook-esemény:{" "}
+            <code className="font-semibold">{unpinned.join(", ")}</code>
+            {account ? (
+              <>
+                {" "}— a tokenünk viszont a <strong>@{account.username}</strong> fiókhoz tartozik.
+                Ha a fenti azonosítók között olyan is van, ami nem ez a fiók, akkor idegen
+                postaláda üzeneteit dolgozzuk fel: az AI-hívás kifizetődik, a válasz nem megy ki, és
+                a beszélgetések bekerülnek a tárolóba.
+              </>
+            ) : null}{" "}
+            Állítsd be az <code className="font-semibold">IG_ACCOUNT_ID</code> env változót a saját
+            fiókod azonosítójára, vagy a Meta dashboardon kapcsold ki a webhook-feliratkozást a
+            többi fióknál.
+          </p>
+        )}
+        {unpinned.length > 0 && (
+          <form action={resetAccountIds} className="mt-3">
+            <button type="submit" className="btn-ghost">
+              Lista nullázása
+            </button>
+            <span className="mt-2 block text-[13px]">
+              Miután a dashboardon átállítottad a feliratkozást, nullázd a listát, és írass egy
+              DM-et a fiókodnak. Ami ezután megjelenik itt, az az élesben bekötött fiók —
+              ezt az azonosítót kell az IG_ACCOUNT_ID-ba tenni.
+            </span>
+          </form>
+        )}
+        {config.length > 0 && (
+          <p className="mt-1.5">
+            Hiányzó mező a konfigurációban (forrás:{" "}
+            <code className="font-semibold">{resolved.source}</code>):{" "}
+            <code className="font-semibold">{config.join(", ")}</code> — amíg ez nincs kitöltve, a
+            bot tárolja az üzeneteket, de nem válaszol.
+          </p>
+        )}
+      </Notice>
     </div>
   );
 }
 
 export default async function Admin() {
-  const [conversations, globalOn] = await Promise.all([listConversations(), isBotEnabled()]);
-  const totalCost = conversations.reduce((sum, c) => sum + c.costUsd, 0);
-  const { source } = await clientConfig();
+  const role = await currentRole();
+  const owner = role === "owner";
+
+  const [conversations, globalOn, cost] = await Promise.all([
+    listConversations(),
+    isBotEnabled(),
+    owner ? costSoFar() : Promise.resolve(null),
+  ]);
+
+  const stats = overview(conversations);
+  const latest = conversations.slice(0, 5);
+  const avgPerConv = conversations.length
+    ? conversations.reduce((sum, c) => sum + c.costUsd, 0) / conversations.length
+    : 0;
 
   return (
-    <>
-      <TopBar tag="Admin">
-        <Link href="/onboarding" className="btn-quiet">
-          Konfiguráció szerkesztése
-        </Link>
-      </TopBar>
+    <main className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6 sm:py-10">
+      <h1 className="text-[28px] font-bold leading-tight sm:text-[34px]">Áttekintő</h1>
 
-      <main className="mx-auto max-w-[1100px] px-4 py-10 sm:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* Nagy állapotjelző: egy pillantásból látszódjon, megy-e a bot. */}
+      <div
+        className={`mt-6 flex flex-wrap items-center justify-between gap-4 rounded-[14px] border p-5 ${
+          globalOn ? "border-green-line bg-green-soft" : "border-brick/30 bg-brick-soft"
+        }`}
+      >
+        <div className="flex items-center gap-3.5">
+          <span
+            className={`h-3.5 w-3.5 shrink-0 rounded-full ${globalOn ? "bg-green" : "bg-brick"}`}
+            aria-hidden
+          />
           <div>
-            <h1 className="text-[30px] font-bold leading-tight sm:text-[38px]">Beszélgetések</h1>
-            <p className="mt-2 text-[15px] text-muted">
-              {conversations.length} beszélgetés · összesített AI-költség{" "}
-              <strong className="text-ink">{money(totalCost)}</strong> · konfiguráció:{" "}
-              <code>{source}</code>
+            <p
+              className={`font-display text-[20px] font-bold leading-tight ${
+                globalOn ? "text-green-dark" : "text-brick"
+              }`}
+            >
+              {globalOn ? "A bot be van kapcsolva" : "A bot le van állítva"}
+            </p>
+            <p className={`mt-1 text-sm ${globalOn ? "text-green-dark/80" : "text-brick/80"}`}>
+              {globalOn
+                ? "Az új üzenetekre és kommentekre válaszol."
+                : "Az üzenetek megérkeznek és tárolódnak, de nincs válasz."}
             </p>
           </div>
+        </div>
 
+        {owner && (
           <form action={toggleGlobal}>
             <input type="hidden" name="on" value={globalOn ? "0" : "1"} />
-            <button
-              className={globalOn ? "btn-ghost" : "btn-primary"}
-              type="submit"
-              aria-label={globalOn ? "Bot leállítása mindenhol" : "Bot visszakapcsolása"}
-            >
-              {globalOn ? "Vészkapcsoló: bot leállítása" : "Bot visszakapcsolása"}
+            <button className={globalOn ? "btn-ghost" : "btn-primary"} type="submit">
+              {globalOn ? "Bot leállítása" : "Bot visszakapcsolása"}
             </button>
           </form>
-        </div>
-
-        <Setup />
-
-        {!globalOn && (
-          <p className="mt-6 rounded-[10px] border border-brick/30 bg-brick-soft px-4 py-3 text-[15px] text-brick">
-            A bot globálisan le van állítva. Az üzenetek megérkeznek és tárolódnak, de nincs válasz.
-          </p>
         )}
+      </div>
 
-        <div className="card mt-8 divide-y divide-line">
-          {conversations.length === 0 && (
-            <p className="p-6 text-[15px] text-muted">
-              Még nincs beszélgetés. Írj a fiókodnak egy DM-et, és itt megjelenik.
-            </p>
-          )}
+      {owner && (
+        <>
+          <Setup />
+          <Unhandled />
+        </>
+      )}
 
-          {conversations.map((c) => (
-            <div key={c.id} className="flex flex-wrap items-center gap-4 p-5">
-              <Link href={`/admin/${encodeURIComponent(c.id)}`} className="min-w-0 flex-1">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Mai beszélgetések" value={String(stats.today)} />
+        <Stat label="Elmúlt 7 nap" value={String(stats.week)} />
+        <Stat
+          label="Végig a bot kezelte"
+          value={String(stats.botHandled)}
+          note={`${stats.handedOff} beszélgetés került emberhez`}
+        />
+        <Stat
+          label="Átlagos válaszidő"
+          value={stats.avgResponseMs === null ? "—" : duration(stats.avgResponseMs, true)}
+          note={
+            stats.avgResponseMs === null
+              ? "Még nincs mérhető válasz."
+              : `Pontosan: ${duration(stats.avgResponseMs)}`
+          }
+        />
+      </div>
+
+      {owner && cost && (
+        <>
+          <h2 className="mt-10 text-[20px] font-bold">AI-költség</h2>
+          <p className="mt-1.5 text-[15px] text-muted">
+            Becsült összeg a modell token-árai alapján. Csak te látod.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <Stat label="Ma" value={money(cost.today)} />
+            <Stat label="Ebben a hónapban" value={money(cost.month)} />
+            <Stat
+              label="Beszélgetésenkénti átlag"
+              value={conversations.length ? money(avgPerConv) : "—"}
+              note={`${conversations.length} tárolt beszélgetés`}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="mt-10 flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-[20px] font-bold">Legutóbbi beszélgetések</h2>
+        <Link href="/admin/beszelgetesek" className="text-[15px] font-semibold text-green">
+          Mind megnyitása
+        </Link>
+      </div>
+
+      <div className="mt-4">
+        {latest.length === 0 ? (
+          <Empty>
+            Itt fognak megjelenni a beszélgetések, ahogy megérkeznek. Írj a fiókodnak egy DM-et, vagy
+            kommentelj egy posztod alá — az első pár percen belül itt lesz.
+          </Empty>
+        ) : (
+          <div className="card divide-y divide-line">
+            {latest.map((c) => (
+              <Link
+                key={c.id}
+                href={`/admin/beszelgetesek/${encodeURIComponent(c.id)}`}
+                className="block p-5 transition hover:bg-paper"
+              >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold">{c.id}</span>
+                  <span className="min-w-0 truncate font-semibold">{convName(c)}</span>
                   <State conv={c} />
+                  <FromComment conv={c} />
+                  <Ignored conv={c} />
                 </div>
-                <p className="mt-1.5 truncate text-[15px] text-muted">{lastText(c)}</p>
-                <p className="mt-1 text-xs text-micro">
-                  {when(c.lastActivity)} · {money(c.costUsd)} · {c.tokens.input + c.tokens.output}{" "}
-                  token
+                <p className="mt-1.5 truncate text-[15px] text-muted">
+                  {c.messages.at(-1)?.text ?? "Még nincs üzenet ebben a beszélgetésben."}
                 </p>
+                <p className="mt-1 text-xs text-micro">{when(c.lastActivity)}</p>
               </Link>
-
-              <form action={toggleConversation}>
-                <input type="hidden" name="id" value={c.id} />
-                <input type="hidden" name="on" value={c.botEnabled ? "0" : "1"} />
-                <button className="btn-ghost" type="submit">
-                  {c.botEnabled ? "Bot ki" : "Bot be"}
-                </button>
-              </form>
-            </div>
-          ))}
-        </div>
-      </main>
-    </>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
