@@ -4,6 +4,42 @@ export type EmojiUse = "nincs" | "ritkan" | "gyakran";
 
 export type FaqItem = { q: string; a: string };
 
+/** „Minden poszt" — a szabály nincs konkrét bejegyzéshez kötve. */
+export const MINDEN_POSZT = "minden";
+
+/**
+ * Egy komment-szabály: mire reagálunk, melyik poszt alatt, és mit küldünk.
+ * A privát válasz DM-ben megy, a nyilvános a komment alá.
+ */
+export type CommentRule = {
+  /** stabil azonosító — a statisztika és a szerkesztés ehhez kötődik */
+  id: string;
+  /** emberi név, csak az admin felületen látszik */
+  nev: string;
+  be: boolean;
+  /** egyezés kis/nagybetű és ékezet nélkül, részszóra is */
+  kulcsszavak: string[];
+  /** poszt (média) azonosító, vagy MINDEN_POSZT */
+  poszt: string;
+  /** a privát DM szövege; ha üres, az AI generálja a konfigurációból */
+  privatSzoveg: string;
+  /** nyilvános válaszok a komment alá; véletlenül választunk közülük */
+  nyilvanosValaszok: string[];
+};
+
+let ruleSeq = 0;
+
+export const emptyRule = (): CommentRule => ({
+  // Date.now() egy böngészőben több szabály létrehozásakor ütközhet, ezért a sorszám is kell
+  id: `szabaly-${Date.now().toString(36)}-${(ruleSeq++).toString(36)}`,
+  nev: "",
+  be: true,
+  kulcsszavak: [],
+  poszt: MINDEN_POSZT,
+  privatSzoveg: "",
+  nyilvanosValaszok: [],
+});
+
 export type NoraConfig = {
   alapok: {
     nev: string;
@@ -41,6 +77,7 @@ export type NoraConfig = {
     forrasok: string[];
     kampanyKulcsszo: string;
   };
+  commentRules: CommentRule[];
 };
 
 export const ATADAS_ALAP = [
@@ -65,6 +102,7 @@ export const emptyConfig = (): NoraConfig => ({
   gyik: [{ q: "", a: "" }],
   hatarok: { atadasEsetei: [...ATADAS_ALAP], sohaNeMondja: "", fallbackMondat: "" },
   inditok: { forrasok: [], kampanyKulcsszo: "" },
+  commentRules: [],
 });
 
 /** Importált JSON-t összefésüli az üres alapértelmezéssel, hogy hiányzó mező ne dobjon hibát. */

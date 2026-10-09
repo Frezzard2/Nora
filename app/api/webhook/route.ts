@@ -1,8 +1,10 @@
 import { after } from "next/server";
+import { handleComment } from "@/lib/handleComment";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
 import {
   firstDelivery,
+  isOwnComment,
   isSelfId,
   markSelfId,
   noteEntryId,
@@ -33,12 +35,31 @@ type MessagingEvent = {
   recipient?: { id?: string };
   message?: { mid?: string; text?: string; is_echo?: boolean };
 };
+/**
+ * A `comments` webhook-mező alakja a Meta dokumentációja szerint:
+ * https://developers.facebook.com/docs/instagram-platform/webhooks
+ */
+type CommentEvent = {
+  /**
+   * A komment azonosítója. A Meta webhook-példája `comment_id`-t mutat, a
+   * gyakorlatban `id` is érkezik — mindkettőt elfogadjuk, mert ezen a projekten
+   * már egyszer elcsúszott a dashboard-teszt és a valódi esemény alakja.
+   */
+  comment_id?: string;
+  id?: string;
+  /** a szülő komment azonosítója, ha ez egy válasz-komment */
+  parent_id?: string;
+  text?: string;
+  from?: { id?: string; username?: string };
+  media?: { id?: string; media_product_type?: string };
+};
+
 type Entry = {
   /** annak a fióknak az azonosítója, amelyre az esemény érkezett */
   id?: string;
   messaging?: MessagingEvent[];
   /** a Meta dashboard „Send to Server" tesztje ebben az alakban küld */
-  changes?: { field?: string; value?: MessagingEvent }[];
+  changes?: { field?: string; value?: MessagingEvent & CommentEvent }[];
 };
 type Payload = { entry?: Entry[] };
 
@@ -69,6 +90,13 @@ function eventsOf(entry: Entry): MessagingEvent[] {
     .map((c) => c.value as MessagingEvent);
 
   return [...(entry.messaging ?? []), ...fromChanges];
+}
+
+/** A `comments` mező eseményei (komment és válasz-komment egyaránt). */
+function commentsOf(entry: Entry): CommentEvent[] {
+  return (entry.changes ?? [])
+    .filter((c) => c.field === "comments" && c.value)
+    .map((c) => c.value as CommentEvent);
 }
 
 export async function POST(req: Request) {
@@ -111,7 +139,8 @@ async function process_(payload: Payload) {
     }
 
     const events = eventsOf(entry);
-    if (!events.length) {
+    const comments = commentsOf(entry);
+    if (!events.length && !comments.length) {
       const shape = shapeOf(entry);
       console.info("[webhook] Feldolgozható esemény nélküli entry. Szerkezet:", JSON.stringify(shape));
       await noteUnhandled(shape);
@@ -165,6 +194,55 @@ async function process_(payload: Payload) {
         await handleMessage(senderId, text);
       } catch (err) {
         console.error("[webhook] Feldolgozási hiba:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    for (const c of comments) {
+      const commentId = c.comment_id ?? c.id;
+      const fromId = c.from?.id;
+      const text = c.text?.trim();
+      if (!commentId || !fromId || !text) {
+        // a szerkezetet eltesszük (kulcsok és típusok, tartalom nélkül): ebből
+        // derül ki, ha a Meta más mezőneveket küld, mint amit a kód vár
+        const shape = shapeOf(c);
+        console.info("[webhook] Hiányos komment-esemény, kihagyva. Szerkezet:", JSON.stringify(shape));
+        await noteUnhandled(shape);
+        continue;
+      }
+
+      /**
+       * A saját fiók kommentje. A Meta a mi nyilvános válaszunkról is küld
+       * webhookot, és enélkül a bot a saját válaszára reagálna.
+       */
+      if (fromId === entry.id || (ownAccount && fromId === ownAccount) || (await isSelfId(fromId))) {
+        console.info("[webhook] Saját komment, kihagyva.");
+        continue;
+      }
+      if (await isOwnComment(commentId)) {
+        console.info("[webhook] A saját válasz-kommentünk, kihagyva.");
+        continue;
+      }
+
+      // ugyanaz a duplikátum-szűrés, mint a DM-eknél, csak komment ID-ra
+      if (!(await firstDelivery(commentId))) {
+        console.info(`[webhook] Már feldolgozott komment (${commentId}), kihagyva.`);
+        continue;
+      }
+
+      try {
+        await handleComment({
+          commentId,
+          userId: fromId,
+          username: c.from?.username,
+          text,
+          mediaId: c.media?.id,
+          parentId: c.parent_id,
+        });
+      } catch (err) {
+        console.error(
+          "[webhook] Komment-feldolgozási hiba:",
+          err instanceof Error ? err.message : err,
+        );
       }
     }
   }
