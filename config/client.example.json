@@ -71,5 +71,25 @@
       "instagram"
     ],
     "kampanyKulcsszo": ""
-  }
+  },
+  "commentRules": [
+    {
+      "id": "pelda-ar",
+      "nev": "Ár-érdeklődés",
+      "be": true,
+      "kulcsszavak": [
+        "ár",
+        "mennyi",
+        "mennyibe",
+        "info"
+      ],
+      "poszt": "minden",
+      "privatSzoveg": "",
+      "nyilvanosValaszok": [
+        "Megírtam privátban! 💬",
+        "Küldtem DM-et a részletekkel.",
+        "Írtam privátban, nézd meg!"
+      ]
+    }
+  ]
 }

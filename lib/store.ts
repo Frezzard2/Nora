@@ -13,6 +13,22 @@ export type StoredMessage = { role: "user" | "assistant"; text: string; at: numb
 export type Conversation = {
   /** Instagram-scoped user ID — ez a kulcs */
   id: string;
+  /**
+   * Instagram felhasználónév. Kommentből azonnal megkapjuk, DM-nél külön lekérdezés.
+   * Üres sztring: lekértük, de nem kaptuk meg — így nem próbáljuk újra minden üzenetnél.
+   * Hiányzó mező: még nem kértük le.
+   */
+  username?: string;
+  /**
+   * Figyelmen kívül hagyott fiók: se DM-re, se kommentre nem reagálunk, és az
+   * üzenetet sem tároljuk. A saját személyes fiókodra kell — az üzeneted valódi
+   * DM-ként érkezik, a visszhang-szűrés nem fogja meg.
+   */
+  ignored?: boolean;
+  /** honnan indult a beszélgetés */
+  source: "dm" | "comment";
+  /** a poszt (média) azonosítója, ha kommentből indult */
+  postId?: string;
   messages: StoredMessage[];
   /** embernek átadva: a bot innentől hallgat */
   handedOff: boolean;
@@ -34,6 +50,13 @@ const KEY = {
   lastUnhandled: "nora:debug:last-unhandled",
   lastIds: "nora:debug:last-ids",
   sent: (hash: string) => `nora:sent:${hash}`,
+  /** egy kommentre csak EGY privát válasz mehet — ez a nyoma, lejárat nélkül */
+  privateReplied: (commentId: string) => `nora:preply:${commentId}`,
+  /** a saját nyilvános válasz-kommentjeink, hogy ne reagáljunk magunkra */
+  ownComment: (commentId: string) => `nora:own-comment:${commentId}`,
+  ruleHit: (ruleId: string, day: string) => `nora:rulehit:${ruleId}:${day}`,
+  costDay: (day: string) => `nora:cost:d:${day}`,
+  costMonth: (month: string) => `nora:cost:m:${month}`,
   selfIds: "nora:self-ids",
   entryIds: "nora:debug:entry-ids",
   counter: (scope: string) => `nora:count:${scope}`,
@@ -50,6 +73,7 @@ const db = () => (redis ??= Redis.fromEnv());
 
 const fresh = (id: string): Conversation => ({
   id,
+  source: "dm",
   messages: [],
   handedOff: false,
   botEnabled: true,
@@ -174,6 +198,15 @@ export async function getEntryIds(): Promise<string[]> {
   return await db().smembers(KEY.entryIds);
 }
 
+/**
+ * A megfigyelt fiók-azonosítók nullázása. A lista halmozódik, ezért egy rosszul
+ * bekötött fiók azonosítója örökre ott maradna — így viszont a webhook-beállítás
+ * módosítása után tiszta lappal látod, melyik fiókról érkezik tényleg esemény.
+ */
+export async function clearEntryIds(): Promise<void> {
+  await db().del(KEY.entryIds);
+}
+
 /** Hibakereséshez: a legutóbbi esemény opak azonosítói, tartalom nélkül. */
 export async function noteIds(ids: unknown): Promise<void> {
   await db().set(KEY.lastIds, { at: new Date().toISOString(), ids }, { ex: 60 * 60 * 24 });
@@ -189,4 +222,79 @@ export async function bump(scope: string, ttlSeconds: number): Promise<number> {
   const n = await db().incr(key);
   if (n === 1) await db().expire(key, ttlSeconds);
   return n;
+}
+
+/**
+ * true, ha erre a kommentre MOST megy ki először privát válasz.
+ *
+ * A Meta szabálya: egy kommentre összesen egy privát üzenet küldhető. A második
+ * próbálkozást a Meta hibával utasítja el, de addig is kiszámoltuk az AI-választ.
+ * Ezért lejárat nélkül tároljuk — amire egyszer ment, arra soha többet.
+ */
+export async function firstPrivateReply(commentId: string): Promise<boolean> {
+  return (await db().set(KEY.privateReplied(commentId), 1, { nx: true })) === "OK";
+}
+
+/**
+ * A saját nyilvános válasz-kommentünk azonosítója. A Meta a mi kommentünkről is
+ * küld webhookot, és a `from.id` szűrés nem minden esetben elég (lásd a DM-ek
+ * visszhang-szűrését) — ezért amit kiírtunk, azt felismerjük.
+ */
+export async function markOwnComment(commentId: string): Promise<void> {
+  await db().set(KEY.ownComment(commentId), 1, { ex: 60 * 60 * 24 * 30 });
+}
+
+export async function isOwnComment(commentId: string): Promise<boolean> {
+  return (await db().exists(KEY.ownComment(commentId))) === 1;
+}
+
+/** Napi bontású szabály-találat. A 7 napos kimutatáshoz 8 napig él. */
+export async function bumpRuleHit(ruleId: string): Promise<void> {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = KEY.ruleHit(ruleId, day);
+  if ((await db().incr(key)) === 1) await db().expire(key, 60 * 60 * 24 * 8);
+}
+
+const DAYS_BACK = 7;
+
+/** Szabályonként az elmúlt 7 nap találatszáma. */
+export async function ruleHits(ruleIds: string[]): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  if (!ruleIds.length) return out;
+
+  const days = Array.from({ length: DAYS_BACK }, (_, i) =>
+    new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10),
+  );
+  const keys = ruleIds.flatMap((id) => days.map((d) => KEY.ruleHit(id, d)));
+  const values = await db().mget<(number | null)[]>(...keys);
+
+  ruleIds.forEach((id, i) => {
+    out[id] = values
+      .slice(i * DAYS_BACK, (i + 1) * DAYS_BACK)
+      .reduce<number>((sum, v) => sum + Number(v ?? 0), 0);
+  });
+  return out;
+}
+
+/**
+ * AI-költség napi és havi bontásban. A beszélgetésekben tárolt összeg csak
+ * halmozott, az „mai / havi költség" ebből nem jönne ki.
+ */
+export async function bumpCost(usd: number): Promise<void> {
+  if (!(usd > 0)) return;
+  const now = new Date().toISOString();
+  await db().incrbyfloat(KEY.costDay(now.slice(0, 10)), usd);
+  await db().expire(KEY.costDay(now.slice(0, 10)), 60 * 60 * 24 * 40);
+  await db().incrbyfloat(KEY.costMonth(now.slice(0, 7)), usd);
+  await db().expire(KEY.costMonth(now.slice(0, 7)), 60 * 60 * 24 * 400);
+}
+
+/** [mai, e havi] AI-költség USD-ben. */
+export async function costSoFar(): Promise<{ today: number; month: number }> {
+  const now = new Date().toISOString();
+  const [today, month] = await db().mget<(string | number | null)[]>(
+    KEY.costDay(now.slice(0, 10)),
+    KEY.costMonth(now.slice(0, 7)),
+  );
+  return { today: Number(today ?? 0), month: Number(month ?? 0) };
 }
