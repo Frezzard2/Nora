@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, roleFromCookie } from "@/lib/session";
 
 /**
- * HTTP Basic a nem nyilvános felületek előtt.
+ * Munkamenet-süti a nem nyilvános felületek előtt.
  *
- * Nyilvános marad: a főoldal, az /adatvedelem (a Meta app publikálásához kell)
- * és az /api/webhook (a Meta hívja, saját aláírás-ellenőrzéssel).
+ * Nyilvános marad: a főoldal, az /adatvedelem (a Meta app publikálásához kell),
+ * az /api/webhook (a Meta hívja, saját aláírás-ellenőrzéssel) és a /belepes.
  *
  * Az /api/reply és a /simulator azért van bent, mert fizetett AI-hívást
  * indítanak — nyilvános deployon enélkül bárki égethetné a kvótát.
@@ -13,33 +14,26 @@ export const config = {
   matcher: ["/admin/:path*", "/onboarding/:path*", "/simulator/:path*", "/api/config", "/api/reply"],
 };
 
-const challenge = () =>
-  new NextResponse("Bejelentkezés szükséges.", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Nora admin", charset="UTF-8"' },
-  });
+/** Fejlesztői eszközök: ezeket az ügyfél nem látja, csak a tulajdonos. */
+const OWNER_ONLY = ["/onboarding", "/simulator", "/api/reply"];
 
-/** Konstans idejű összehasonlítás (az edge futtatókörnyezetben nincs node:crypto). */
-function equals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
+export async function middleware(req: NextRequest) {
+  const role = await roleFromCookie(req.cookies.get(SESSION_COOKIE)?.value);
+  const path = req.nextUrl.pathname;
 
-export function middleware(req: NextRequest) {
-  const password = process.env.ADMIN_PASSWORD;
-  // ha nincs beállított jelszó, az oldal zárva marad — soha nem nyitjuk ki
-  if (!password) return challenge();
-
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Basic ")) return challenge();
-
-  try {
-    const given = atob(header.slice("Basic ".length)).split(":").slice(1).join(":");
-    if (equals(given, password)) return NextResponse.next();
-  } catch {
-    /* hibás base64 — ugyanaz a válasz, mint a rossz jelszónál */
+  if (!role) {
+    // API-hívásnál nincs értelme átirányításnak — a kliens kódja kezelje
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "A munkamenet lejárt. Jelentkezz be újra." }, { status: 401 });
+    }
+    const login = new URL("/belepes", req.url);
+    if (path !== "/admin") login.searchParams.set("tovabb", path);
+    return NextResponse.redirect(login);
   }
-  return challenge();
+
+  if (role !== "owner" && OWNER_ONLY.some((p) => path.startsWith(p))) {
+    return NextResponse.redirect(new URL("/admin", req.url));
+  }
+
+  return NextResponse.next();
 }

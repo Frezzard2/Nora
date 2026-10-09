@@ -1,9 +1,16 @@
 import "server-only";
 import { clientConfig } from "./clientConfig";
-import { sendMessage } from "./instagram";
+import { fetchUsername, sendMessage } from "./instagram";
 import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
-import { bump, isBotEnabled, update, type StoredMessage } from "./store";
+import {
+  bump,
+  bumpCost,
+  getConversation,
+  isBotEnabled,
+  update,
+  type StoredMessage,
+} from "./store";
 
 /** Beszélgetésenkénti napi válaszkorlát: egy hibás kör ne égessen el pénzt. */
 const DAILY_LIMIT = Number(process.env.MAX_REPLIES_PER_DAY ?? 20);
@@ -21,8 +28,24 @@ const toIncoming = (m: StoredMessage): IncomingMessage => ({
  * A hívó (webhook) ezt már a 200-as válasz után futtatja.
  */
 export async function handleMessage(senderId: string, text: string): Promise<void> {
+  const before = await getConversation(senderId);
+
+  /**
+   * Figyelmen kívül hagyott fiók — tipikusan a sajátod. A saját személyes
+   * fiókodból írt üzenet valódi DM-ként érkezik, a visszhang-szűrés nem fogja
+   * meg. Itt nem is tároljuk, hogy ne szennyezze a beszélgetés-listát.
+   */
+  if (before.ignored) {
+    console.info(`[nora] ${senderId}: figyelmen kívül hagyott fiók, nincs feldolgozás.`);
+    return;
+  }
+
+  // a felhasználónevet egyszer kérjük le beszélgetésenként (üres sztring = megpróbáltuk)
+  const username = before.username ?? (await fetchUsername(senderId));
+
   const conv = await update(senderId, (c) => ({
     ...c,
+    username: c.username ?? username,
     messages: [...c.messages, { role: "user" as const, text, at: Date.now() }],
     lastActivity: Date.now(),
   }));
@@ -82,6 +105,9 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
   } else {
     console.warn(`[nora] ${senderId}: az AI üres választ adott, nem küldünk semmit.`);
   }
+
+  // napi/havi költség-kimutatáshoz: a beszélgetésben csak halmozott összeg van
+  if (reply.usage?.costUsd) await bumpCost(reply.usage.costUsd);
 
   await update(senderId, (c) => ({
     ...c,

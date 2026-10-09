@@ -101,6 +101,9 @@ export default function Simulator() {
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar tag="Próbamód">
+        <Link href="/admin" className="btn-quiet">
+          Felület
+        </Link>
         <Link href="/onboarding" className="btn-ghost">
           Beállítás szerkesztése
         </Link>

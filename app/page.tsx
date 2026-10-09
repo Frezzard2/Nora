@@ -23,12 +23,9 @@ const steps = [
 export default function Home() {
   return (
     <>
-      <TopBar tag="Demó">
-        <Link href="/simulator" className="btn-quiet">
-          Szimulátor
-        </Link>
-        <Link href="/onboarding" className="btn-primary">
-          Beállítás
+      <TopBar>
+        <Link href="/belepes" className="btn-primary">
+          Belépés
         </Link>
       </TopBar>
 
@@ -41,14 +38,21 @@ export default function Home() {
           asszisztens válaszol — és átadja neked a beszélgetést, amikor kell.
         </p>
 
-        <div className="mt-9 flex flex-wrap gap-3">
-          <Link href="/onboarding" className="btn-primary">
-            Beállítás indítása
+        {/*
+          A /onboarding és a /simulator csak a tulajdonosnak nyílik meg, ezért a
+          nyilvános oldalról a belépésre küldünk — onnan mindenki oda jut, ami jár neki.
+        */}
+        <div className="mt-9 flex flex-wrap items-center gap-3">
+          <Link href="/belepes" className="btn-primary">
+            Belépés a felületre
           </Link>
-          <Link href="/simulator" className="btn-ghost">
-            Ugrás a szimulátorra
+          <Link href="/adatvedelem" className="btn-quiet">
+            Adatvédelem
           </Link>
         </div>
+        <p className="mt-4 text-[15px] text-muted">
+          A felülethez jelszó kell. Ha kreátorként kaptál hozzáférést, ugyanitt lépj be.
+        </p>
 
         <div className="mt-16 grid gap-5 sm:grid-cols-3">
           {steps.map((s) => (

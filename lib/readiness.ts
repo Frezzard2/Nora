@@ -38,3 +38,19 @@ export function configGaps(c: NoraConfig): string[] {
   if (missing(c.ajanlat.celLink)) gaps.push("ajanlat.celLink");
   return gaps;
 }
+
+/**
+ * A configGaps() kulcsainak emberi neve. A felületen soha nem a technikai nevet
+ * mutatjuk az ügyfélnek — ezt a szöveget látja, ha mentés előtt hiányzik valami.
+ */
+export const GAP_LABEL: Record<string, string> = {
+  "alapok.nev vagy markanev": "a neved vagy a márkanév",
+  "alapok.kinekMibenSegit": "egy mondat arról, kinek miben segítesz",
+  "ajanlat.foSzolgaltatas": "a fő szolgáltatás",
+  "ajanlat.ar": "az ár (vagy kapcsold ki, hogy elárulható)",
+  "ajanlat.celLink": "a cél-link",
+};
+
+/** Hiányzó mezők felsorolása magyarul. */
+export const gapSentence = (gaps: string[]) =>
+  gaps.map((g) => GAP_LABEL[g] ?? g).join(", ");
