@@ -2,6 +2,7 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth";
 import { clientConfig } from "@/lib/clientConfig";
 import { fetchOwnAccount } from "@/lib/instagram";
+import { dailyCostLimitUsd, overDailyCostLimit } from "@/lib/limits";
 import { configGaps, envGaps } from "@/lib/readiness";
 import { duration, overview } from "@/lib/stats";
 import { costSoFar, getEntryIds, getUnhandled, isBotEnabled, listConversations } from "@/lib/store";
@@ -116,11 +117,15 @@ export default async function Admin() {
   const role = await currentRole();
   const owner = role === "owner";
 
+  // A költség összegét csak a tulajdonos látja, de a plafon betelését az
+  // ügyfélnek is tudnia kell — különben nem érti, miért hallgat a bot.
   const [conversations, globalOn, cost] = await Promise.all([
     listConversations(),
     isBotEnabled(),
-    owner ? costSoFar() : Promise.resolve(null),
+    costSoFar(),
   ]);
+  const costLimit = dailyCostLimitUsd();
+  const costCapReached = overDailyCostLimit(cost.today, costLimit);
 
   const stats = overview(conversations);
   const latest = conversations.slice(0, 5);
@@ -169,6 +174,19 @@ export default async function Admin() {
         )}
       </div>
 
+      {costCapReached && (
+        <div className="mt-6">
+          <Notice kind="warn">
+            <strong className="font-semibold">A napi AI-költségplafon betelt.</strong>
+            <p className="mt-1.5">
+              {owner
+                ? `A mai becsült AI-költség $${cost.today.toFixed(2)}, a plafon $${costLimit}. A bot ma nem generál több választ — az üzenetek megérkeznek és tárolódnak. A plafon éjfélkor nullázódik, vagy emeld a DAILY_COST_LIMIT_USD env változót.`
+                : "A bot ma elérte a napi korlátját, ezért nem válaszol új üzenetekre. Az üzenetek megérkeznek és itt megjelennek — holnap magától újraindul. Ha sürgős, szólj nekünk."}
+            </p>
+          </Notice>
+        </div>
+      )}
+
       {owner && (
         <>
           <Setup />
@@ -195,7 +213,7 @@ export default async function Admin() {
         />
       </div>
 
-      {owner && cost && (
+      {owner && (
         <>
           <h2 className="mt-10 text-[20px] font-bold">AI-költség</h2>
           <p className="mt-1.5 text-[15px] text-muted">

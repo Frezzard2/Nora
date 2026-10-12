@@ -1,11 +1,13 @@
 import "server-only";
 import { clientConfig } from "./clientConfig";
 import { fetchUsername, sendMessage } from "./instagram";
+import { dailyCostLimitUsd, overDailyCostLimit } from "./limits";
 import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
 import {
   bump,
   bumpCost,
+  costSoFar,
   getConversation,
   isBotEnabled,
   update,
@@ -82,6 +84,19 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
   const day = new Date().toISOString().slice(0, 10);
   if ((await bump(`reply:${senderId}:${day}`, 60 * 60 * 24)) > DAILY_LIMIT) {
     console.warn(`[nora] Napi válaszkorlát (${DAILY_LIMIT}) elérve ezen a beszélgetésen.`);
+    return;
+  }
+
+  // Globális napi AI-költségplafon. A beszélgetésenkénti korlát nem véd az
+  // ellen, ha sok beszélgetés fut egyszerre — ez igen. Az ellenőrzés az
+  // AI-hívás ELŐTT van, különben pont azt fizetnénk ki, amit meg akarunk fogni.
+  const costLimit = dailyCostLimitUsd();
+  const { today: costToday } = await costSoFar();
+  if (overDailyCostLimit(costToday, costLimit)) {
+    console.error(
+      `[nora] Napi AI-költségplafon elérve ($${costToday.toFixed(4)} / $${costLimit}) — ` +
+        "ma nincs több válasz. Az üzenetek tárolódnak.",
+    );
     return;
   }
 
