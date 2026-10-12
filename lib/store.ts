@@ -1,9 +1,13 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
+import { makeKeys } from "./keys.ts";
 
 /**
- * Beszélgetés-állapot tárolása. Serverless futásnál a memória két hívás között
+ * Beszélgetés-állapot tárolása.
+ *
+ * Minden kulcs a lib/keys.ts névteres kulcsképzőjén megy át (REDIS_PREFIX),
+ * hogy több deploy osztozhasson egy Upstash adatbázison. Serverless futásnál a memória két hívás között
  * eldobódik, ezért kell külső tároló. Minden adatbázis-hozzáférés ezen a
  * modulon megy át — csak ezt a fájlt kell kicserélni, ha nem Upstash lesz.
  */
@@ -40,27 +44,7 @@ export type Conversation = {
   costUsd: number;
 };
 
-const KEY = {
-  conv: (id: string) => `nora:conv:${id}`,
-  /** index: beszélgetés-ID-k utolsó aktivitás szerint */
-  index: "nora:convs",
-  seen: (mid: string) => `nora:seen:${mid}`,
-  botSwitch: "nora:bot",
-  config: "nora:config",
-  lastUnhandled: "nora:debug:last-unhandled",
-  lastIds: "nora:debug:last-ids",
-  sent: (hash: string) => `nora:sent:${hash}`,
-  /** egy kommentre csak EGY privát válasz mehet — ez a nyoma, lejárat nélkül */
-  privateReplied: (commentId: string) => `nora:preply:${commentId}`,
-  /** a saját nyilvános válasz-kommentjeink, hogy ne reagáljunk magunkra */
-  ownComment: (commentId: string) => `nora:own-comment:${commentId}`,
-  ruleHit: (ruleId: string, day: string) => `nora:rulehit:${ruleId}:${day}`,
-  costDay: (day: string) => `nora:cost:d:${day}`,
-  costMonth: (month: string) => `nora:cost:m:${month}`,
-  selfIds: "nora:self-ids",
-  entryIds: "nora:debug:entry-ids",
-  counter: (scope: string) => `nora:count:${scope}`,
-};
+const KEY = makeKeys(process.env.REDIS_PREFIX);
 
 /** A feldolgozott message ID-k ennyi ideig blokkolják az újraküldést. */
 const SEEN_TTL = 60 * 60 * 24;
