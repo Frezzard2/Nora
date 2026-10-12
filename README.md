@@ -349,17 +349,65 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/session.ts` | Munkamenet-süti és a két szerepkör |
 | `lib/instagram.ts` | Kimenő üzenet a Graph API-ra, darabolással és óránkénti korláttal |
 | `lib/store.ts` | **Minden tárolás ezen megy át** (Upstash Redis) — cserélhető |
+| `lib/keys.ts` | **Minden Redis-kulcs itt képződik** — névtér (`REDIS_PREFIX`) |
+| `lib/limits.ts` | Napi AI-költségplafon (tiszta függvények, önellenőrzött) |
+| `scripts/migrate-prefix.ts` | Egyszeri migráció: meglévő kulcsok átnevezése névtérbe |
 | `lib/signature.ts` | Az `X-Hub-Signature-256` ellenőrzése |
 | `lib/chunk.ts` | 1000 karakteres darabolás |
 | `lib/handover.ts` | Az „átadás embernek” jelölő feldolgozása |
 | `middleware.ts` | Munkamenet-ellenőrzés az `/admin` és a fizetős végpontok előtt |
 | `app/api/webhook/route.ts` | A Meta webhook (GET verify, POST események) |
 
+## Több ügyfél egy Upstash adatbázison
+
+Az ingyenes Upstash csomagban egy adatbázis van, ezért több deploy osztozik
+rajta. Az elválasztás kulcs-előtaggal történik: a `REDIS_PREFIX` env változó
+adja a névteret, és **minden** kulcs `<előtag>:...` alakú. A kulcsképzés
+egyetlen helyen van (`lib/keys.ts`) — ha új kulcs kell, oda vedd fel, különben
+kilóg a névtérből.
+
+> **Ez logikai elválasztás, nem fizikai.** Ugyanaz az Upstash token minden
+> névtérhez hozzáfér: aki a tokent megszerzi, az összes ügyfél adatát látja, és
+> egy elgépelt előtag két ügyfelet összeránt. Teszthez és saját deployhoz ez
+> rendben van. **Fizető ügyfélnél adj külön Upstash adatbázist** — külön URL és
+> token, és akkor az előtag már csak kényelmi réteg.
+
+Üresen hagyva az előtag `default`.
+
+### Migráció meglévő adaton
+
+A `REDIS_PREFIX` bevezetése előtt minden kulcs `nora:` előtaggal készült. Az új
+kód a saját névterében keres, tehát a régi kulcsokat át kell nevezni — **a
+konfigurációt (`nora:config`) is beleértve**, különben a bot úgy indul, mintha
+üres lenne az adatbázis, és nem válaszol.
+
+```bash
+npm run migrate-prefix -- --to <előtag>          # forrás alapértelmezésben: nora
+npm run migrate-prefix -- --from nora --to bence
+```
+
+A script felsorolja, mit fog átnevezni, és **rákérdez**, mielőtt bármihez
+hozzányúlna. Nem töröl, és létező célkulcsot nem ír felül (RENAMENX) — ami
+ütközne, azt kihagyja és kiírja. A `--yes` kapcsolóval kérdés nélkül fut.
+
+A sorrend számít: **előbb a migráció, aztán a `REDIS_PREFIX` beállítása és a
+redeploy.** Fordítva a bot addig üres adatbázist lát.
+
 ## Biztonsági korlátok
 
 - Minden POST aláírás-ellenőrzésen megy át (HMAC SHA-256, időzítésbiztos összehasonlítás).
-- Beszélgetésenkénti napi válaszkorlát: `MAX_REPLIES_PER_DAY` (alap: 20).
+- Beszélgetésenkénti napi válaszkorlát: `MAX_REPLIES_PER_DAY` (alap: 20) — az
+  AI-hívás előtt ellenőrizve.
 - Globális óránkénti küldési korlát: `IG_MAX_SENDS_PER_HOUR` (alap: 180).
+- **Globális napi AI-költségplafon: `DAILY_COST_LIMIT_USD` (alap: 2).** A másik
+  két korlát egy beszélgetést, illetve a kiküldést fogja vissza; egyik sem véd
+  az ellen, ha sok beszélgetés fut egyszerre. A plafon az AI-hívás ELŐTT
+  ellenőrzi a nap eddigi becsült költségét, és betelés esetén a bot nem generál
+  több választ — az üzenetek megérkeznek és tárolódnak. Az `/admin` oldalon
+  figyelmeztetés jelenik meg (a tulajdonos látja az összeget is), és a számláló
+  UTC éjfélkor nullázódik.
+- A komment privát válaszának „egy kommentre egyszer" kapuja szintén az
+  AI-hívás előtt van, hogy a második kézbesítés ne kerüljön pénzbe.
 - Globális vészkapcsoló az `/admin` felületen — azonnal elhallgattatja a botot.
 - Duplikált kézbesítés szűrése `message.mid`, illetve komment-ID alapján, 24 órás lejárattal.
 - Egy kommentre csak egyszer megy privát válasz (lejárat nélküli nyom a tárolóban).

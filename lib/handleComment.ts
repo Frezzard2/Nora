@@ -2,11 +2,13 @@ import "server-only";
 import { clientConfig } from "./clientConfig";
 import { matchRule, pickPublic } from "./comment-rules";
 import { sendPrivateReply, sendPublicReply } from "./comments";
+import { dailyCostLimitUsd, overDailyCostLimit } from "./limits";
 import { generateReply, type IncomingMessage } from "./reply-engine";
 import { configGaps } from "./readiness";
 import {
   bump,
   bumpCost,
+  costSoFar,
   bumpRuleHit,
   firstPrivateReply,
   getConversation,
@@ -103,6 +105,17 @@ export async function handleComment(c: IncomingComment): Promise<void> {
       console.error(
         `[komment] A konfiguráció hiányos (${gaps.join(", ")}), forrás: ${source} — nincs válasz. ` +
           "Töltsd ki az /admin/beallitasok oldalon, vagy adj meg a szabálynál kész szöveget.",
+      );
+      return;
+    }
+
+    // Napi AI-költségplafon — csak itt számít: a kész szöveges szabály ingyen van.
+    const costLimit = dailyCostLimitUsd();
+    const { today: costToday } = await costSoFar();
+    if (overDailyCostLimit(costToday, costLimit)) {
+      console.error(
+        `[komment] Napi AI-költségplafon elérve ($${costToday.toFixed(4)} / $${costLimit}) — ` +
+          "ma nincs AI-generált privát válasz.",
       );
       return;
     }
