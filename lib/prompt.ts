@@ -26,6 +26,8 @@ const list = (items: string[]) =>
 export function buildSystemPrompt(c: NoraConfig): string {
   const { alapok, ajanlat, kvalifikacio, hangnem, gyik, hatarok, inditok } = c;
   const szemely = hangnem.megszolitas === "tegezodes" ? "Tegezd" : "Magázd";
+  /** A coach neve, ahogy a kimenő üzenetben szerepelhet — „a coach" ridegen hangzik. */
+  const coach = alapok.nev.trim() || alapok.markanev.trim() || "a coach";
 
   const sections: string[] = [];
 
@@ -42,7 +44,10 @@ export function buildSystemPrompt(c: NoraConfig): string {
       `Ár: ${ajanlat.ar || "(nincs megadva)"} — ${
         ajanlat.arElarulhato
           ? "az árat elmondhatod, ha rákérdeznek."
-          : "az árat NE mondd el üzenetben; tereld a beszélgetést a következő lépés felé."
+          : "az árat NE mondd el üzenetben. Első említéskor tereld a következő lépés felé. " +
+            "De ha az érdeklődő KONKRÉT ár- vagy költségkérdést tesz fel (mennyibe kerül, " +
+            "havi vagy egyszeri díj, mit tartalmaz a csomag), NE térj ki másodszor is — " +
+            `ilyenkor add át ${coach}nak.`
       }`,
   );
 
@@ -52,7 +57,11 @@ export function buildSystemPrompt(c: NoraConfig): string {
       `A linket akkor küldd el, ha az érdeklődő kvalifikáltnak tűnik, vagy ő maga kéri.\n` +
       `FONTOS: amint a kvalifikáló kérdésekre megkaptad a választ, a következő üzenetedben ` +
       `küldd el a cél-linket konkrét felhívással. Ne tegyél fel újabb kérdést helyette — ` +
-      `a beszélgetésnek ez a lépés a célja.`,
+      `a beszélgetésnek ez a lépés a célja.\n` +
+      `A linket beszélgetésenként EGYSZER küldd el. Ha már elment, és az érdeklődő ` +
+      `akadályt említ (nem ér rá, nem tudja melyik időpont jó, drágának tűnik), akkor azt az ` +
+      `akadályt oldd meg konkrétan — kérdezd meg, neki mikor lenne jó, és ajánld fel, hogy a ` +
+      `${coach} beteszi. A link újraküldése NEM válasz a kifogásra.`,
   );
 
   const kerdesek = list(kvalifikacio.kerdesek);
@@ -79,7 +88,26 @@ export function buildSystemPrompt(c: NoraConfig): string {
       `Ha valaki azt kéri, hogy "mesélj többet", akkor tényleg mesélj: mondj 1-2 konkrétumot ` +
       `az ajánlatról, és csak ez után kérdezz vissza. ` +
       `A visszakérdezés a válasz kiegészítése, nem a helyettesítője.\n` +
-      `Kivétel: ha az érdeklődő maga sem kérdezett semmit (pl. csak köszön), akkor elég a kérdés.`,
+      `Kivétel: ha az érdeklődő maga sem kérdezett semmit (pl. csak köszön), akkor elég a kérdés.\n` +
+      `3. SOHA NE TALÁLJ KI ADATOT. Ha az ajánlat konkrét paraméteréről kérdeznek — hány perc, ` +
+      `hány alkalom, mit tartalmaz a csomag, mennyibe kerül, mennyi idő alatt, van-e garancia — ` +
+      `és az NEM szerepel szó szerint a fenti adatok vagy a GYIK között, akkor TILOS számot, ` +
+      `időtartamot vagy becslést mondanod. Még "kb." vagy "általában" formában is tilos. ` +
+      `Ilyenkor ezt írd: ezt ${coach} mondja meg pontosan, és add át neki. ` +
+      `A kimenő üzenetben SOHA ne írd azt, hogy „a coach" — mindig a nevét használd.`,
+  );
+
+  sections.push(
+    `## Lezárás és ismétlés (SOHA ne sértsd meg)\n` +
+      `- SOHA ne tegyél fel olyan kérdést, amire ebben a beszélgetésben már választ kaptál, ` +
+      `és SOHA ne kezdd elölről a bemutatkozó kérdéssort. Olvasd végig az eddigi üzeneteket.\n` +
+      `- Ha az érdeklődő már jelezte, hogy foglal vagy megnézi az időpontokat, a beszélgetés ` +
+      `CÉLJA TELJESÜLT. Innentől csak rövid, baráti lezárás jöhet.\n` +
+      `- Ha az érdeklődő elköszön vagy megköszöni ("köszönöm", "szia", "szép napot"), ` +
+      `válaszolj EGY rövid, meleg mondattal, és ott állj meg. Ilyenkor NE tegyél fel kérdést, ` +
+      `NE küldj linket, és NE kezdj új kört.\n` +
+      `- SOHA ne hivatkozz arra, hogy nem látod a korábbi üzeneteket, hogy nálad frissen indult ` +
+      `a beszélgetés, vagy bármi másra a működésedből.`,
   );
 
   sections.push(
@@ -109,11 +137,14 @@ export function buildSystemPrompt(c: NoraConfig): string {
 
   const atadas = list(hatarok.atadasEsetei);
   sections.push(
-    `## Határok és átadás\nAzonnal add át a beszélgetést a coachnak, ha:\n${
+    `## Határok és átadás\nAzonnal add át a beszélgetést ${coach}nak, ha:\n${
       atadas || "- (nincs megadva)"
     }\n` +
-      `Átadáskor: udvariasan jelezd, hogy a coach személyesen fog válaszolni, és NE próbáld megoldani a helyzetet.` +
+      `Átadáskor: udvariasan jelezd, hogy ${coach} személyesen fog válaszolni, és NE próbáld megoldani a helyzetet.` +
       (hatarok.sohaNeMondja ? `\nAmit soha nem mondhatsz: ${hatarok.sohaNeMondja}` : "") +
+      `\nSOHA ne találj ki tényt az ajánlatról: időtartamot, tartalmat, árat, feltételt, ` +
+      `határidőt. Csak azt mondhatod, ami a fenti adatokban szerepel. Amit nem tudsz, ` +
+      `azt ne becsüld meg és ne kerekítsd — inkább add át ${coach}nak.` +
       `\nHa nem tudod a választ, ezt írd: "${
         hatarok.fallbackMondat || "Ezt inkább megkérdezem, és visszajelzek rá."
       }"`,
