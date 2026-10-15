@@ -2,7 +2,7 @@ import Link from "next/link";
 import { STATE_LABEL, convState, type ConvState } from "@/lib/stats";
 import { listConversations } from "@/lib/store";
 import { handOver, toggleConversation } from "../actions";
-import { Empty, FromComment, Ignored, State, convName, when } from "../ui";
+import { Empty, FromComment, HumanAnswered, Ignored, State, convName, when } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +99,7 @@ export default async function Beszelgetesek({
                       <State conv={c} />
                       <FromComment conv={c} />
                       <Ignored conv={c} />
+                      <HumanAnswered conv={c} />
                     </div>
                     <p className="mt-1.5 truncate text-[15px] text-muted">
                       {c.messages.at(-1)?.text ?? "Még nincs üzenet ebben a beszélgetésben."}

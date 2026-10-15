@@ -58,16 +58,23 @@ export function overview(convs: Conversation[], now = Date.now()): Overview {
     if (conv.messages.some((m) => m.at >= weekAgo)) weekCount++;
 
     if (conv.handedOff) handedOff++;
-    else if (conv.messages.some((m) => m.role === "assistant")) botHandled++;
+    else if (conv.messages.some((m) => m.role === "assistant" && m.by !== "human")) botHandled++;
 
-    // válaszidő: egy bejövő üzenet és az utána következő első válasz között
+    /**
+     * Válaszidő: egy bejövő üzenet és az utána következő első BOT-válasz között.
+     * A kézzel írt válasz nem számít bele — az órákkal később is jöhet, és a
+     * bot sebességét mérjük, nem az emberét. Ilyenkor az ablakot lezárjuk,
+     * de nem könyveljük el.
+     */
     let pending: number | null = null;
     for (const m of conv.messages) {
       if (m.role === "user") {
         if (pending === null) pending = m.at;
       } else if (pending !== null) {
-        responseSum += Math.max(0, m.at - pending);
-        responseCount++;
+        if (m.by !== "human") {
+          responseSum += Math.max(0, m.at - pending);
+          responseCount++;
+        }
         pending = null;
       }
     }

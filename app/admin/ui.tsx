@@ -36,6 +36,13 @@ export function FromComment({ conv }: { conv: Conversation }) {
   );
 }
 
+/** Az utolsó üzenetet ember írta kézzel — a beszélgetést valaki felvette. */
+export function HumanAnswered({ conv }: { conv: Conversation }) {
+  const last = conv.messages.at(-1);
+  if (last?.role !== "assistant" || last.by !== "human") return null;
+  return <span className={`${BADGE} bg-ink text-white`}>Kézzel megválaszolva</span>;
+}
+
 /** Figyelmen kívül hagyott fiók — a bot ide soha nem válaszol. */
 export function Ignored({ conv }: { conv: Conversation }) {
   if (!conv.ignored) return null;

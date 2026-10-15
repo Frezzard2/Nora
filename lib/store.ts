@@ -13,7 +13,17 @@ import { makeKeys } from "./keys.ts";
  * modulon megy át — csak ezt a fájlt kell kicserélni, ha nem Upstash lesz.
  */
 
-export type StoredMessage = { role: "user" | "assistant"; text: string; at: number };
+export type StoredMessage = {
+  role: "user" | "assistant";
+  text: string;
+  at: number;
+  /**
+   * Ki írta a kimenő üzenetet. Hiányzó mező = bot (a korábbi üzenetek miatt).
+   * Az "human" az, amit az ügyfél kézzel írt az Instagramból — ezt a visszhangból
+   * tanuljuk meg (lásd lib/handleEcho.ts).
+   */
+  by?: "bot" | "human";
+};
 
 export type Conversation = {
   /** Instagram-scoped user ID — ez a kulcs */

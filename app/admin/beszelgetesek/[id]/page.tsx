@@ -97,7 +97,11 @@ export default async function Beszelgetes({ params }: { params: Promise<{ id: st
             >
               <div
                 className={`whitespace-pre-wrap rounded-[14px] px-4 py-3 text-[15px] leading-relaxed ${
-                  m.role === "user" ? "border border-line bg-card" : "bg-green text-white"
+                  m.role === "user"
+                    ? "border border-line bg-card"
+                    : m.by === "human"
+                      ? "bg-ink text-white"
+                      : "bg-green text-white"
                 }`}
               >
                 {m.text}
@@ -107,7 +111,12 @@ export default async function Beszelgetes({ params }: { params: Promise<{ id: st
                   m.role === "user" ? "text-left" : "text-right"
                 }`}
               >
-                {m.role === "user" ? "Érdeklődő" : "Asszisztens"} · {when(m.at)}
+                {m.role === "user"
+                  ? "Érdeklődő"
+                  : m.by === "human"
+                    ? "Kézzel válaszolva"
+                    : "Asszisztens"}{" "}
+                · {when(m.at)}
               </p>
             </div>
           ))
