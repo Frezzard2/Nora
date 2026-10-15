@@ -1,6 +1,7 @@
 import "server-only";
 import { clientConfig } from "./clientConfig";
 import { fetchUsername, sendMessage } from "./instagram";
+import { isUsefulQuestion, MAX_QUESTION_LENGTH } from "./gaps";
 import { dailyCostLimitUsd, overDailyCostLimit } from "./limits";
 import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
@@ -8,6 +9,7 @@ import {
   bump,
   bumpCost,
   costSoFar,
+  noteGap,
   getConversation,
   isBotEnabled,
   update,
@@ -123,6 +125,20 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
 
   // napi/havi költség-kimutatáshoz: a beszélgetésben csak halmozott összeg van
   if (reply.usage?.costUsd) await bumpCost(reply.usage.costUsd);
+
+  /**
+   * Amire nem tudott válaszolni. Az átadás azt jelenti, hogy a bot elakadt —
+   * az ezt kiváltó kérdés pont az, ami hiányzik a GYIK-ből. Az admin felület
+   * ebből állítja össze a listát, hogy ne tippelni kelljen.
+   */
+  if (reply.handover && isUsefulQuestion(text)) {
+    await noteGap({
+      question: text.slice(0, MAX_QUESTION_LENGTH),
+      at: Date.now(),
+      convId: senderId,
+      username: conv.username,
+    });
+  }
 
   await update(senderId, (c) => ({
     ...c,

@@ -2,11 +2,19 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth";
 import { clientConfig } from "@/lib/clientConfig";
 import { fetchOwnAccount } from "@/lib/instagram";
+import { groupGaps } from "@/lib/gaps";
 import { dailyCostLimitUsd, overDailyCostLimit } from "@/lib/limits";
 import { configGaps, envGaps } from "@/lib/readiness";
 import { duration, overview } from "@/lib/stats";
-import { costSoFar, getEntryIds, getUnhandled, isBotEnabled, listConversations } from "@/lib/store";
-import { resetAccountIds, toggleGlobal } from "./actions";
+import {
+  costSoFar,
+  getEntryIds,
+  getUnhandled,
+  isBotEnabled,
+  listConversations,
+  listGaps,
+} from "@/lib/store";
+import { clearAnswerGaps, resetAccountIds, toggleGlobal } from "./actions";
 import { Empty, FromComment, Ignored, Notice, Stat, State, convName, money, when } from "./ui";
 
 export const dynamic = "force-dynamic";
@@ -119,11 +127,14 @@ export default async function Admin() {
 
   // A költség összegét csak a tulajdonos látja, de a plafon betelését az
   // ügyfélnek is tudnia kell — különben nem érti, miért hallgat a bot.
-  const [conversations, globalOn, cost] = await Promise.all([
+  const [conversations, globalOn, cost, gaps] = await Promise.all([
     listConversations(),
     isBotEnabled(),
     costSoFar(),
+    listGaps(),
   ]);
+  // amire a bot elakadt — ezekből lesznek a hiányzó GYIK-bejegyzések
+  const hianyzoValaszok = groupGaps(gaps).slice(0, 8);
   const costLimit = dailyCostLimitUsd();
   const costCapReached = overDailyCostLimit(cost.today, costLimit);
 
@@ -212,6 +223,50 @@ export default async function Admin() {
           }
         />
       </div>
+
+      {hianyzoValaszok.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-[20px] font-bold">Amire nem tudott válaszolni</h2>
+          <p className="mt-1.5 max-w-[640px] text-[15px] leading-relaxed text-muted">
+            Ezeket a kérdéseket kapta a bot, és nem tudott rájuk válaszolni — ilyenkor átadja a
+            beszélgetést. Ha felveszed őket a gyakori kérdések közé, legközelebb magától válaszol.
+          </p>
+
+          <div className="card mt-4 divide-y divide-line">
+            {hianyzoValaszok.map((gap) => (
+              <div key={`${gap.convId}-${gap.at}`} className="flex flex-wrap items-start gap-3 p-4">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] leading-relaxed">{gap.question}</span>
+                  <span className="mt-1 block text-xs text-micro">
+                    {gap.username ? `@${gap.username} · ` : ""}
+                    {when(gap.at)}
+                  </span>
+                </span>
+                {gap.count > 1 && (
+                  <span className="tag shrink-0">{gap.count}× kérdezték</span>
+                )}
+                <Link
+                  href={`/admin/beszelgetesek/${encodeURIComponent(gap.convId)}`}
+                  className="shrink-0 text-[15px] font-semibold text-green"
+                >
+                  Megnézem
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <Link href="/admin/beallitasok" className="btn-primary">
+              Felveszem a gyakori kérdések közé
+            </Link>
+            <form action={clearAnswerGaps}>
+              <button type="submit" className="btn-quiet">
+                Letisztáztam, lista törlése
+              </button>
+            </form>
+          </div>
+        </section>
+      )}
 
       {owner && (
         <>
