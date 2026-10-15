@@ -352,6 +352,8 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/keys.ts` | **Minden Redis-kulcs itt képződik** — névtér (`REDIS_PREFIX`) |
 | `lib/limits.ts` | Napi AI-költségplafon (tiszta függvények, önellenőrzött) |
 | `lib/gaps.ts` | „Amire nem tudott válaszolni" — a megválaszolatlan kérdések összevonása |
+| `lib/echo.ts` | Visszhang-osztályozás: bot vagy kézzel írt üzenet (önellenőrzött) |
+| `lib/handleEcho.ts` | A kézzel írt válasz eltárolása — soha nem generál választ |
 | `scripts/migrate-prefix.ts` | Egyszeri migráció: meglévő kulcsok átnevezése névtérbe |
 | `lib/signature.ts` | Az `X-Hub-Signature-256` ellenőrzése |
 | `lib/chunk.ts` | 1000 karakteres darabolás |
@@ -409,6 +411,31 @@ Ebből lesz a hiányzó GYIK-bejegyzés: nem tippelni kell, mire kíváncsiak az
 > Ez a kör csak akkor működik, ha valaki ránéz. A rendszer szándékosan **nem**
 > írja át magától a konfigurációt: egy ügyfél üzletét viszi, és a csendes
 > elcsúszás rosszabb, mint egy ismert hiány.
+## Kézzel írt válaszok
+
+A Meta a fiók minden kimenő üzenetét visszaküldi `is_echo` jelzéssel — azt is,
+amit a bot küldött, és azt is, amit az ügyfél **kézzel írt az Instagramból**.
+Korábban mindet eldobtuk; most a kézi válaszokat eltároljuk.
+
+Ebből két dolog derül ki:
+
+- **Megválaszolták-e.** Az átadott beszélgetésnél eddig nem lehetett tudni, hogy
+  az ügyfél felvette-e a szálat. Most az admin „Kézzel megválaszolva" jelzést
+  mutat, és a beszélgetés-nézetben a kézi üzenet külön színnel látszik.
+- **Mintaanyag.** Az ügyfél saját szavai a legjobb tananyag a bot számára —
+  ezek a `hangnem.dmPeldak` mező természetes utánpótlása.
+
+A szétválasztás két független jelen alapul (`lib/echo.ts`): a rövid életű
+küldés-nyomon és a már eltárolt üzenetekkel való összevetésen. Ha a nyom lejár,
+a második fogja meg.
+
+> **A visszhang-ág soha nem generál és nem küld választ** — csak tárol. Enélkül
+> visszatérne a korábbi hiba, amikor a bot a saját üzenetére válaszolt.
+> Kimenő üzenetből új beszélgetés sem keletkezik: ha az ügyfél ír rá valakire
+> először, abból nem lesz fantom-rekord.
+
+A `message_echoes` webhook-mezőre fel kell iratkozni a Meta dashboardon
+(a `messages` mellé).
 
 ## Biztonsági korlátok
 

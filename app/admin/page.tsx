@@ -15,7 +15,18 @@ import {
   listGaps,
 } from "@/lib/store";
 import { clearAnswerGaps, resetAccountIds, toggleGlobal } from "./actions";
-import { Empty, FromComment, Ignored, Notice, Stat, State, convName, money, when } from "./ui";
+import {
+  Empty,
+  FromComment,
+  HumanAnswered,
+  Ignored,
+  Notice,
+  Stat,
+  State,
+  convName,
+  money,
+  when,
+} from "./ui";
 
 export const dynamic = "force-dynamic";
 
@@ -312,6 +323,7 @@ export default async function Admin() {
                   <State conv={c} />
                   <FromComment conv={c} />
                   <Ignored conv={c} />
+                  <HumanAnswered conv={c} />
                 </div>
                 <p className="mt-1.5 truncate text-[15px] text-muted">
                   {c.messages.at(-1)?.text ?? "Még nincs üzenet ebben a beszélgetésben."}

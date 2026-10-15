@@ -79,6 +79,39 @@ assert.equal(halmozott.avgResponseMs, 10_000);
 
 assert.equal(overview([], NOW).avgResponseMs, null);
 
+// --- a kézzel írt válasz nem torzíthatja a bot válaszidejét ---
+const keziValasz = overview(
+  [
+    conv({
+      messages: [
+        { role: "user", text: "Számlát tudsz adni?", at: NOW - 3 * 60 * MIN },
+        // az ügyfél csak három óra múlva válaszolt kézzel az Instagramból
+        { role: "assistant", text: "Bocsi a késésért!", at: NOW, by: "human" },
+      ],
+    }),
+  ],
+  NOW,
+);
+assert.equal(keziValasz.avgResponseMs, null, "a kézi válasz nem bot-válaszidő");
+assert.equal(keziValasz.botHandled, 0, "kézi válasz nem jelenti, hogy a bot kezelte");
+
+// vegyes beszélgetés: csak a bot válaszát mérjük
+const vegyes = overview(
+  [
+    conv({
+      messages: [
+        { role: "user", text: "a", at: NOW - 10 * MIN },
+        { role: "assistant", text: "bot válasz", at: NOW - 10 * MIN + 5000 },
+        { role: "user", text: "b", at: NOW - 5 * MIN },
+        { role: "assistant", text: "kézi válasz", at: NOW, by: "human" },
+      ],
+    }),
+  ],
+  NOW,
+);
+assert.equal(vegyes.avgResponseMs, 5000, "csak a bot 5 másodperce számít");
+assert.equal(vegyes.botHandled, 1, "volt bot-válasz is, tehát a bot kezelte");
+
 // --- időtartam ---
 assert.equal(duration(4200), "4 másodperc");
 assert.equal(duration(90_000), "1 perc 30 másodperc");

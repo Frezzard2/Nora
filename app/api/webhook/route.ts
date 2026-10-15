@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { handleComment } from "@/lib/handleComment";
+import { handleEcho } from "@/lib/handleEcho";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
 import {
@@ -86,7 +87,7 @@ function shapeOf(value: unknown, depth = 0): unknown {
  */
 function eventsOf(entry: Entry): MessagingEvent[] {
   const fromChanges = (entry.changes ?? [])
-    .filter((c) => c.field === "messages" && c.value)
+    .filter((c) => (c.field === "messages" || c.field === "message_echoes") && c.value)
     .map((c) => c.value as MessagingEvent);
 
   return [...(entry.messaging ?? []), ...fromChanges];
@@ -151,9 +152,34 @@ async function process_(payload: Payload) {
       const senderId = event.sender?.id;
       if (!msg || !senderId) continue;
 
-      // a saját visszhangzó üzenetünk — nélküle a bot magának válaszolna
+      const text = msg.text?.trim();
+
+      /**
+       * A fiók KIMENŐ üzenete, visszhangként. Lehet a boté (azt már tároltuk),
+       * vagy amit az ügyfél kézzel írt az Instagramból — az utóbbit eltesszük,
+       * mert abból derül ki, hogy egy átadott beszélgetést megválaszoltak-e.
+       *
+       * Visszhangnál a beszélgetés partnere a CÍMZETT, nem a küldő: a küldő
+       * maga a fiók. A handleEcho SOHA nem generál és nem küld választ.
+       */
       if (msg.is_echo) {
-        console.info("[webhook] Saját visszhangzó üzenet (is_echo), kihagyva.");
+        const partnerId = event.recipient?.id;
+        if (!partnerId || !text || !msg.mid) {
+          console.info("[webhook] Hiányos vagy nem szöveges visszhang, kihagyva.");
+          continue;
+        }
+        if (!(await firstDelivery(msg.mid))) {
+          console.info(`[webhook] Már feldolgozott visszhang (${msg.mid}), kihagyva.`);
+          continue;
+        }
+        try {
+          await handleEcho(partnerId, text);
+        } catch (err) {
+          console.error(
+            "[webhook] Visszhang-feldolgozási hiba:",
+            err instanceof Error ? err.message : err,
+          );
+        }
         continue;
       }
 
@@ -163,7 +189,6 @@ async function process_(payload: Payload) {
         continue;
       }
 
-      const text = msg.text?.trim();
       // ponytail: csak szöveget kezelünk; kép/hang/sticker esetén nincs válasz
       if (!text || !msg.mid) {
         console.info(`[webhook] Nem szöveges üzenet ${senderId}-től, kihagyva.`);
