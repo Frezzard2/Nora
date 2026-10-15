@@ -5,6 +5,7 @@ import { currentRole } from "@/lib/auth";
 import { configGaps } from "@/lib/readiness";
 import {
   clearEntryIds,
+  clearGaps,
   conversationExists,
   setBotEnabled,
   setStoredConfig,
@@ -96,6 +97,17 @@ export async function resetAccountIds() {
   }
   await clearEntryIds();
   console.info("[admin] A megfigyelt fiók-azonosítók törölve.");
+  revalidatePath("/admin");
+}
+
+/**
+ * „Amire nem tudott válaszolni" lista kiürítése. Akkor kell, ha a kérdéseket
+ * már felvettétek a GYIK-be — utána tiszta lappal gyűlnek az újak.
+ */
+export async function clearAnswerGaps() {
+  await currentRole();
+  await clearGaps();
+  console.info("[admin] A megválaszolatlan kérdések listája kiürítve.");
   revalidatePath("/admin");
 }
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
+import type { Gap } from "./gaps.ts";
 import { makeKeys } from "./keys.ts";
 
 /**
@@ -281,4 +282,36 @@ export async function costSoFar(): Promise<{ today: number; month: number }> {
     KEY.costMonth(now.slice(0, 7)),
   );
   return { today: Number(today ?? 0), month: Number(month ?? 0) };
+}
+
+/** Ennyi megválaszolatlan kérdést tartunk meg — a legfrissebbek elöl. */
+const GAP_MAX = 100;
+
+/**
+ * Feljegyzi a kérdést, amire a bot nem tudott válaszolni (átadta a beszélgetést).
+ * Ebből áll össze az admin felület „amire nem tudott válaszolni" listája, és
+ * ezekből lesznek a hiányzó GYIK-bejegyzések.
+ */
+export async function noteGap(gap: Gap): Promise<void> {
+  await db().lpush(KEY.gaps, JSON.stringify(gap));
+  await db().ltrim(KEY.gaps, 0, GAP_MAX - 1);
+}
+
+export async function listGaps(): Promise<Gap[]> {
+  const rows = await db().lrange<string | Gap>(KEY.gaps, 0, GAP_MAX - 1);
+  // az Upstash a JSON-t magától vissza tudja alakítani — mindkét alakot kezeljük
+  return rows
+    .map((row) => {
+      if (typeof row !== "string") return row;
+      try {
+        return JSON.parse(row) as Gap;
+      } catch {
+        return null;
+      }
+    })
+    .filter((g): g is Gap => Boolean(g?.question));
+}
+
+export async function clearGaps(): Promise<void> {
+  await db().del(KEY.gaps);
 }

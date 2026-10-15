@@ -58,6 +58,8 @@ export function makeKeys(rawPrefix: string | undefined | null) {
     selfIds: `${p}:self-ids`,
     entryIds: `${p}:debug:entry-ids`,
     counter: (scope: string) => `${p}:count:${scope}`,
+    /** „amire nem tudott válaszolni" — a GYIK-hiányok gyűjtője */
+    gaps: `${p}:gaps`,
   };
 }
 
@@ -82,5 +84,6 @@ export function sampleKeys(keys: Keys): string[] {
     keys.selfIds,
     keys.entryIds,
     keys.counter("send:2026-10-12T13"),
+    keys.gaps,
   ];
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { clientConfig } from "./clientConfig";
 import { matchRule, pickPublic } from "./comment-rules";
 import { sendPrivateReply, sendPublicReply } from "./comments";
+import { isUsefulQuestion, MAX_QUESTION_LENGTH } from "./gaps";
 import { dailyCostLimitUsd, overDailyCostLimit } from "./limits";
 import { generateReply, type IncomingMessage } from "./reply-engine";
 import { configGaps } from "./readiness";
@@ -9,6 +10,7 @@ import {
   bump,
   bumpCost,
   costSoFar,
+  noteGap,
   bumpRuleHit,
   firstPrivateReply,
   getConversation,
@@ -148,6 +150,16 @@ export async function handleComment(c: IncomingComment): Promise<void> {
 
   const sent = await sendPrivateReply(c.commentId, body);
   if (usage?.costUsd) await bumpCost(usage.costUsd);
+
+  // lásd handleMessage: az átadást kiváltó kérdés a hiányzó GYIK-bejegyzés
+  if (handover && isUsefulQuestion(c.text)) {
+    await noteGap({
+      question: c.text.slice(0, MAX_QUESTION_LENGTH),
+      at: Date.now(),
+      convId: c.userId,
+      username: c.username ?? conv.username,
+    });
+  }
 
   const at = Date.now();
   await update(c.userId, (prev) => ({

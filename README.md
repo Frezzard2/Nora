@@ -351,6 +351,7 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/store.ts` | **Minden tárolás ezen megy át** (Upstash Redis) — cserélhető |
 | `lib/keys.ts` | **Minden Redis-kulcs itt képződik** — névtér (`REDIS_PREFIX`) |
 | `lib/limits.ts` | Napi AI-költségplafon (tiszta függvények, önellenőrzött) |
+| `lib/gaps.ts` | „Amire nem tudott válaszolni" — a megválaszolatlan kérdések összevonása |
 | `scripts/migrate-prefix.ts` | Egyszeri migráció: meglévő kulcsok átnevezése névtérbe |
 | `lib/signature.ts` | Az `X-Hub-Signature-256` ellenőrzése |
 | `lib/chunk.ts` | 1000 karakteres darabolás |
@@ -392,6 +393,22 @@ hozzányúlna. Nem töröl, és létező célkulcsot nem ír felül (RENAMENX) �
 
 A sorrend számít: **előbb a migráció, aztán a `REDIS_PREFIX` beállítása és a
 redeploy.** Fordítva a bot addig üres adatbázist lát.
+
+## Amire nem tudott válaszolni
+
+A bot megtanulja, mi hiányzik a saját beállításaiból. Valahányszor átadja a
+beszélgetést (mert nem tudott válaszolni), eltesszük a kérdést, ami ezt
+kiváltotta. Az `/admin` áttekintőn ezek összevontan jelennek meg — az azonos
+kérdések egy sorba kerülnek, írásjeltől és ékezettől függetlenül, a
+leggyakoribb elöl.
+
+Ebből lesz a hiányzó GYIK-bejegyzés: nem tippelni kell, mire kíváncsiak az
+érdeklődők, hanem ők maguk mondják meg. A lista a „Letisztáztam" gombbal
+üríthető, ha a kérdéseket már felvettétek a beállításoknál.
+
+> Ez a kör csak akkor működik, ha valaki ránéz. A rendszer szándékosan **nem**
+> írja át magától a konfigurációt: egy ügyfél üzletét viszi, és a csendes
+> elcsúszás rosszabb, mint egy ismert hiány.
 
 ## Biztonsági korlátok
 
