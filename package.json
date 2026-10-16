@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check": "node lib/handover.check.ts && node lib/webhook.check.ts && node lib/comments.check.ts && node lib/stats.check.ts && node lib/keys.check.ts && node lib/limits.check.ts && node lib/gaps.check.ts && node lib/echo.check.ts",
+    "check": "node lib/handover.check.ts && node lib/webhook.check.ts && node lib/comments.check.ts && node lib/stats.check.ts && node lib/keys.check.ts && node lib/limits.check.ts && node lib/gaps.check.ts && node lib/echo.check.ts && node lib/notify.check.ts",
     "migrate-prefix": "node scripts/migrate-prefix.ts"
   },
   "dependencies": {
@@ -16,13 +16,15 @@
     "next": "^15.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.7.0"
   }

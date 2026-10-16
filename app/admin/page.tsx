@@ -3,6 +3,7 @@ import { currentRole } from "@/lib/auth";
 import { clientConfig } from "@/lib/clientConfig";
 import { fetchOwnAccount } from "@/lib/instagram";
 import { groupGaps } from "@/lib/gaps";
+import { pushConfigured, vapidPublicKey } from "@/lib/push";
 import { dailyCostLimitUsd, overDailyCostLimit } from "@/lib/limits";
 import { configGaps, envGaps } from "@/lib/readiness";
 import { duration, overview } from "@/lib/stats";
@@ -15,6 +16,7 @@ import {
   listGaps,
 } from "@/lib/store";
 import { clearAnswerGaps, resetAccountIds, toggleGlobal } from "./actions";
+import PushBeallitas from "./push";
 import {
   Empty,
   FromComment,
@@ -334,6 +336,8 @@ export default async function Admin() {
           </div>
         )}
       </div>
+
+      {pushConfigured() && <PushBeallitas vapidPublicKey={vapidPublicKey()} />}
     </main>
   );
 }

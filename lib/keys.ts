@@ -60,6 +60,10 @@ export function makeKeys(rawPrefix: string | undefined | null) {
     counter: (scope: string) => `${p}:count:${scope}`,
     /** „amire nem tudott válaszolni" — a GYIK-hiányok gyűjtője */
     gaps: `${p}:gaps`,
+    /** push értesítés feliratkozások (endpoint → feliratkozás) */
+    pushSubs: `${p}:push-subs`,
+    /** beszélgetésenkénti értesítés-fék, hogy ne szóljon percenként */
+    pushThrottle: (convId: string) => `${p}:push-throttle:${convId}`,
   };
 }
 
@@ -85,5 +89,7 @@ export function sampleKeys(keys: Keys): string[] {
     keys.entryIds,
     keys.counter("send:2026-10-12T13"),
     keys.gaps,
+    keys.pushSubs,
+    keys.pushThrottle("u1"),
   ];
 }

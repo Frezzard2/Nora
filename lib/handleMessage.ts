@@ -2,6 +2,7 @@ import "server-only";
 import { clientConfig } from "./clientConfig";
 import { fetchUsername, sendMessage } from "./instagram";
 import { isUsefulQuestion, MAX_QUESTION_LENGTH } from "./gaps";
+import { notifyAboutConversation } from "./push";
 import { dailyCostLimitUsd, overDailyCostLimit } from "./limits";
 import { configGaps } from "./readiness";
 import { generateReply, type IncomingMessage } from "./reply-engine";
@@ -58,12 +59,21 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
   // ahol az ügyfél szövege landol. Ami a hibakereséshez kell, az a hossz és a sorsa.
   console.info(`[nora] ← ${senderId}: ${text.length} karakter`);
 
-  if (conv.handedOff) {
-    console.info(`[nora] ${senderId}: embernek átadva, a bot hallgat.`);
-    return;
-  }
-  if (!conv.botEnabled) {
-    console.info(`[nora] ${senderId}: a bot ezen a beszélgetésen ki van kapcsolva.`);
+  /**
+   * A bot hallgat, de az érdeklődő ír. Ez az a pillanat, ami korábban némán
+   * elveszett: az Instagram értesítése semmit nem jelez, mert a szál a bot
+   * korábbi válaszától megválaszoltnak látszik. Itt szólunk az ügyfélnek.
+   */
+  if (conv.handedOff || !conv.botEnabled) {
+    console.info(
+      `[nora] ${senderId}: ${conv.handedOff ? "embernek átadva" : "a bot ki van kapcsolva"}, a bot hallgat.`,
+    );
+    await notifyAboutConversation({
+      reason: "varakozik",
+      convId: senderId,
+      username: conv.username,
+      text,
+    });
     return;
   }
 
@@ -131,6 +141,15 @@ export async function handleMessage(senderId: string, text: string): Promise<voi
    * az ezt kiváltó kérdés pont az, ami hiányzik a GYIK-ből. Az admin felület
    * ebből állítja össze a listát, hogy ne tippelni kelljen.
    */
+  if (reply.handover) {
+    await notifyAboutConversation({
+      reason: "atadas",
+      convId: senderId,
+      username: conv.username,
+      text,
+    });
+  }
+
   if (reply.handover && isUsefulQuestion(text)) {
     await noteGap({
       question: text.slice(0, MAX_QUESTION_LENGTH),
