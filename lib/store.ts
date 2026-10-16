@@ -325,3 +325,51 @@ export async function listGaps(): Promise<Gap[]> {
 export async function clearGaps(): Promise<void> {
   await db().del(KEY.gaps);
 }
+
+/**
+ * Push értesítés feliratkozások. Kulcs az endpoint (böngészőnként és
+ * eszközönként egyedi), így ugyanaz a telefon nem kerül be kétszer.
+ */
+export type PushSub = {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+};
+
+export async function addPushSub(sub: PushSub): Promise<void> {
+  await db().hset(KEY.pushSubs, { [sub.endpoint]: JSON.stringify(sub) });
+}
+
+export async function removePushSub(endpoint: string): Promise<void> {
+  await db().hdel(KEY.pushSubs, endpoint);
+}
+
+export async function listPushSubs(): Promise<PushSub[]> {
+  const rows = (await db().hgetall<Record<string, string | PushSub>>(KEY.pushSubs)) ?? {};
+  return Object.values(rows)
+    .map((row) => {
+      if (typeof row !== "string") return row;
+      try {
+        return JSON.parse(row) as PushSub;
+      } catch {
+        return null;
+      }
+    })
+    .filter((s): s is PushSub => Boolean(s?.endpoint));
+}
+
+export async function countPushSubs(): Promise<number> {
+  return (await db().hlen(KEY.pushSubs)) ?? 0;
+}
+
+/**
+ * Értesítés-fék: beszélgetésenként legfeljebb ennyi időnként szólunk. Egy
+ * gyorsan gépelő érdeklődő különben öt értesítést váltana ki egy perc alatt.
+ */
+const PUSH_THROTTLE_SECONDS = 10 * 60;
+
+/** true, ha MOST szabad értesíteni ezen a beszélgetésen. */
+export async function mayNotify(convId: string): Promise<boolean> {
+  return (
+    (await db().set(KEY.pushThrottle(convId), 1, { nx: true, ex: PUSH_THROTTLE_SECONDS })) === "OK"
+  );
+}

@@ -353,6 +353,9 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/limits.ts` | Napi AI-költségplafon (tiszta függvények, önellenőrzött) |
 | `lib/gaps.ts` | „Amire nem tudott válaszolni" — a megválaszolatlan kérdések összevonása |
 | `lib/echo.ts` | Visszhang-osztályozás: bot vagy kézzel írt üzenet (önellenőrzött) |
+| `lib/notify.ts` | Az értesítés szövege és linkje (tiszta függvények, önellenőrzött) |
+| `lib/push.ts` | Push kiküldése, fék és lejárt feliratkozások takarítása |
+| `public/sw.js` | Service worker — csak értesítés, szándékosan nincs offline gyorsítótár |
 | `lib/handleEcho.ts` | A kézzel írt válasz eltárolása — soha nem generál választ |
 | `scripts/migrate-prefix.ts` | Egyszeri migráció: meglévő kulcsok átnevezése névtérbe |
 | `lib/signature.ts` | Az `X-Hub-Signature-256` ellenőrzése |
@@ -437,6 +440,34 @@ a második fogja meg.
 A `message_echoes` webhook-mezőre fel kell iratkozni a Meta dashboardon
 (a `messages` mellé).
 
+## Értesítés a telefonra
+
+Az Instagram magától értesít minden DM-ről — de a bot 4 másodperc alatt
+válaszol, ezért mire az ügyfél ránéz, a beszélgetés **megválaszoltnak látszik**.
+Pont az az eset vész el, amikor neki kellene lépnie. Ez az értesítés csak akkor
+szól, amikor tényleg ember kell:
+
+- a bot **átadta** a beszélgetést, vagy
+- valaki ír egy olyan szálra, ahol a bot **már hallgat** (átadva vagy kikapcsolva)
+
+Beszélgetésenként legfeljebb 10 percenként szól, hogy egy gyorsan gépelő
+érdeklődő ne váltson ki értesítés-záport. Az értesítésre koppintva egyenesen az
+adott beszélgetés nyílik meg.
+
+### Beállítás
+
+1. Kulcspár ügyfelenként: `npx web-push generate-vapid-keys` → `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` a Vercelen.
+2. Az ügyfél megnyitja az `/admin` oldalt, és az **Értesítés a telefonodra**
+   dobozban bekapcsolja. A **Próba-értesítés** gombbal rögtön ellenőrizheti.
+
+> **iPhone-on egy lépés kell előbb:** a Safari megosztás gombjával ki kell tenni
+> az oldalt a kezdőképernyőre, és onnan megnyitni. Az Apple csak így enged push
+> értesítést (iOS 16.4+). A felület ezt magától kiírja, ha iPhone-t észlel.
+
+A feliratkozás eszközönként külön él, és a névtérben tárolódik — több telefon is
+kaphat értesítést. A lejárt feliratkozásokat a rendszer magától kitakarítja.
+
 ## Biztonsági korlátok
 
 - Minden POST aláírás-ellenőrzésen megy át (HMAC SHA-256, időzítésbiztos összehasonlítás).
@@ -458,6 +489,7 @@ A `message_echoes` webhook-mezőre fel kell iratkozni a Meta dashboardon
 - A saját fiók kommentjeit és a saját nyilvános válaszainkat kiszűrjük — enélkül a
   bot magára reagálna.
 - Titkok csak szerveroldalon: nincs `NEXT_PUBLIC_` kulcs, a `.env.local` nincs a repóban.
+  A push publikus VAPID kulcsa is szerveroldalról jut a felületre, nem env változón át.
 - Jelszó mögött: `/admin`, `/onboarding`, `/simulator`, `/api/config`, `/api/reply`.
   Az utolsó kettő azért, mert fizetett AI-hívást indítanak — nyilvános deployon
   enélkül bárki égethetné a kvótát.

@@ -2,14 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth";
+import { sendTestNotification } from "@/lib/push";
 import { configGaps } from "@/lib/readiness";
 import {
+  addPushSub,
   clearEntryIds,
   clearGaps,
   conversationExists,
+  removePushSub,
   setBotEnabled,
   setStoredConfig,
   update,
+  type PushSub,
 } from "@/lib/store";
 import { mergeConfig } from "@/lib/types";
 
@@ -109,6 +113,32 @@ export async function clearAnswerGaps() {
   await clearGaps();
   console.info("[admin] A megválaszolatlan kérdések listája kiürítve.");
   revalidatePath("/admin");
+}
+
+/** Eszköz feliratkoztatása push értesítésre. */
+export async function subscribeToPush(sub: PushSub) {
+  await currentRole();
+  if (!sub?.endpoint || !sub.keys?.p256dh || !sub.keys?.auth) {
+    return { ok: false, error: "Hiányos feliratkozás — próbáld újra." };
+  }
+  await addPushSub({ endpoint: sub.endpoint, keys: sub.keys });
+  console.info("[admin] Új eszköz feliratkozott az értesítésekre.");
+  return { ok: true };
+}
+
+export async function unsubscribeFromPush(endpoint: string) {
+  await currentRole();
+  if (endpoint) await removePushSub(endpoint);
+  return { ok: true };
+}
+
+/** Próba-értesítés, hogy az ügyfél lássa: tényleg megérkezik a telefonjára. */
+export async function sendPushTest() {
+  await currentRole();
+  const { ok, kiment } = await sendTestNotification();
+  return ok
+    ? { ok: true, uzenet: `Elküldve ${kiment} eszközre. Nézd meg a telefonodat.` }
+    : { ok: false, uzenet: "Nem sikerült elküldeni. Van feliratkozott eszköz?" };
 }
 
 export type SaveResult = { ok: boolean; gaps?: string[]; error?: string };
