@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { ConfigSection, SECTIONS } from "@/components/config-sections";
 import { CommentRulesEditor } from "@/components/comment-rules";
+import { UtankovetesEditor } from "@/components/followup";
 import { configGaps, gapSentence } from "@/lib/readiness";
 import type { NoraConfig } from "@/lib/types";
 import { saveClientConfig } from "../actions";
@@ -60,6 +61,17 @@ export default function SettingsForm({ initial }: { initial: NoraConfig }) {
         </p>
         <div className="mt-5">
           <CommentRulesEditor config={config} setConfig={setConfig} />
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-[20px] font-bold">Utánkövetés</h2>
+        <p className="mt-1.5 text-[15px] leading-relaxed text-muted">
+          Ha az érdeklődő elhallgat azután, hogy a bot válaszolt neki, küldhetünk egy udvarias
+          emlékeztetőt. Alapból ki van kapcsolva.
+        </p>
+        <div className="mt-5">
+          <UtankovetesEditor config={config} setConfig={setConfig} />
         </div>
       </section>
 

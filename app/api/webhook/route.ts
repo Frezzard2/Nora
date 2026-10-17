@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { handleComment } from "@/lib/handleComment";
 import { handleEcho } from "@/lib/handleEcho";
+import { sweepFollowups } from "@/lib/handleFollowup";
 import { handleMessage } from "@/lib/handleMessage";
 import { verifySignature } from "@/lib/signature";
 import {
@@ -116,8 +117,18 @@ export async function POST(req: Request) {
     return new Response("Bad payload", { status: 400 });
   }
 
-  // A Meta újraküld, ha lassú a válasz: azonnal 200, a feldolgozás utána fut.
-  after(() => process_(payload));
+  /**
+   * A Meta újraküld, ha lassú a válasz: azonnal 200, a feldolgozás utána fut.
+   * Az utánkövetés-söprés is itt kap helyet — nincs cron, a forgalom az óra.
+   */
+  after(async () => {
+    await process_(payload);
+    try {
+      await sweepFollowups();
+    } catch (err) {
+      console.error("[webhook] Utánkövetés-hiba:", err instanceof Error ? err.message : err);
+    }
+  });
   return new Response("EVENT_RECEIVED", { status: 200 });
 }
 

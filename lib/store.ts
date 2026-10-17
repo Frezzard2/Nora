@@ -53,6 +53,9 @@ export type Conversation = {
   tokens: { input: number; output: number };
   /** becsült AI-költség USD-ben */
   costUsd: number;
+  /** hány utánkövető emlékeztető ment ki ebben a beszélgetésben */
+  followupCount?: number;
+  lastFollowupAt?: number;
 };
 
 const KEY = makeKeys(process.env.REDIS_PREFIX);
@@ -371,5 +374,17 @@ const PUSH_THROTTLE_SECONDS = 10 * 60;
 export async function mayNotify(convId: string): Promise<boolean> {
   return (
     (await db().set(KEY.pushThrottle(convId), 1, { nx: true, ex: PUSH_THROTTLE_SECONDS })) === "OK"
+  );
+}
+
+/**
+ * Utánkövetés-söprés féke. A söprés az egész beszélgetés-listát beolvassa,
+ * ezért nem futhat minden webhook-eseménynél — negyedóránként egyszer elég.
+ */
+const FOLLOWUP_SWEEP_SECONDS = 15 * 60;
+
+export async function maySweepFollowups(): Promise<boolean> {
+  return (
+    (await db().set(KEY.followupSweep, 1, { nx: true, ex: FOLLOWUP_SWEEP_SECONDS })) === "OK"
   );
 }

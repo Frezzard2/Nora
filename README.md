@@ -354,6 +354,8 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/gaps.ts` | „Amire nem tudott válaszolni" — a megválaszolatlan kérdések összevonása |
 | `lib/echo.ts` | Visszhang-osztályozás: bot vagy kézzel írt üzenet (önellenőrzött) |
 | `lib/checklist.ts` | Indulási ellenőrzőlista a konfigurációból (önellenőrzött) |
+| `lib/followup.ts` | Utánkövetés kizáró szabályai, a 24 órás ablakkal (önellenőrzött) |
+| `lib/handleFollowup.ts` | A söprés — a webhook-forgalom hajtja, nem cron |
 | `lib/preview.ts` | A „mit válaszolna most?" előzmény-építése (önellenőrzött) |
 | `lib/notify.ts` | Az értesítés szövege és linkje (tiszta függvények, önellenőrzött) |
 | `lib/push.ts` | Push kiküldése, fék és lejárt feliratkozások takarítása |
@@ -494,6 +496,43 @@ GYIK-et, megnyomod egy régi beszélgetésen, és azonnal látod, javult-e — a
 hogy egy valódi érdeklődőn derülne ki. **Semmi nem megy ki Instagramra**, a válasz
 sehova nem tárolódik. A próba valódi AI-hívás, ezért a napi költségplafon rá is
 vonatkozik.
+
+## Utánkövetés
+
+Ha az érdeklődő elhallgat azután, hogy a bot válaszolt neki, kimehet egy
+udvarias emlékeztető. **Alapból ki van kapcsolva** — kéretlen üzenetet küldeni
+más nevében csak szándékosan szabad. A beállításoknál kapcsolható be, és ott
+kell megírni a szövegét is (AI nem generálja: kiszámítható legyen, mi megy ki).
+
+**Mikor NEM ír** — minden feltétel kizáró:
+
+- a beszélgetést átadtátok embernek, vagy a bot ki van kapcsolva rajta
+- a fiók figyelmen kívül van hagyva
+- valaki kézzel válaszolt (akkor az övé a szál)
+- az érdeklődőn van a sor (ő írt utoljára — ilyenkor nem emlékeztetni kell)
+- még nem telt le a beállított csend
+- elfogyott a keret (beszélgetésenként legfeljebb kettő)
+- **kicsúsztunk az Instagram 24 órás ablakából**
+
+### A 24 órás ablak
+
+A Meta szabálya: *„Businesses have up to 24 hours to respond to a user."* Az
+ablak az **érdeklődő utolsó üzenetétől** ketyeg, nem a miénktől. Ezen túl csak
+`HUMAN_AGENT` címkével lehet írni, ami kifejezetten kézi emberi válaszra való —
+automata emlékeztetőre használni szabálysértés volna. Ezért a beállítható
+várakozás felső korlátja 20 óra, és a kód közvetlenül a küldés előtt is
+ellenőrzi az ablakot.
+
+### Miért nincs cron
+
+A Vercel ingyenes csomagja **napi egy** ütemezést enged, ±59 perc pontossággal.
+A 24 órás ablak mellett ez könnyen lekésné vagy túllépné az időt. Ehelyett a
+bejövő webhook-forgalom hajtja a söprést: minden esemény után lefut egy
+negyedóránként fékezett ellenőrzés, és a forgalom a természetes óra.
+
+Következmény: **egy teljesen néma fiókon nem megy ki emlékeztető.** Ahol nincs
+forgalom, ott nincs mit utánkövetni sem. Fizetős csomagon később hozzá lehet
+tenni egy sűrűbb cront ugyanerre a függvényre.
 
 ## Biztonsági korlátok
 

@@ -17,11 +17,12 @@ const HOURLY_LIMIT = Number(process.env.IG_MAX_SENDS_PER_HOUR ?? 180);
 
 type MetaError = { error?: { message?: string; code?: number; error_subcode?: number } };
 
-export async function sendMessage(recipientId: string, text: string): Promise<void> {
+/** true, ha minden darab kiment. A hívó eldöntheti, feljegyzi-e elküldöttként. */
+export async function sendMessage(recipientId: string, text: string): Promise<boolean> {
   const token = process.env.IG_ACCESS_TOKEN;
   if (!token) {
     console.error("[instagram] IG_ACCESS_TOKEN nincs beállítva — az üzenet nem ment ki.");
-    return;
+    return false;
   }
 
   const parts = chunk(text);
@@ -32,7 +33,7 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
       console.error(
         `[instagram] Óránkénti küldési korlát (${HOURLY_LIMIT}) elérve — az üzenet nem ment ki.`,
       );
-      return;
+      return false;
     }
 
     // a visszhang akár a küldés válasza előtt megérkezhet, ezért előbb jegyezzük fel
@@ -54,7 +55,7 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
             e.message ?? "nincs hibaleírás"
           }${e.code ? ` [code ${e.code}${e.error_subcode ? `/${e.error_subcode}` : ""}]` : ""}`,
         );
-        return;
+        return false;
       }
 
       console.info(
@@ -65,9 +66,10 @@ export async function sendMessage(recipientId: string, text: string): Promise<vo
         "[instagram] Hálózati hiba küldéskor:",
         err instanceof Error ? err.message : err,
       );
-      return;
+      return false;
     }
   }
+  return true;
 }
 
 /**
