@@ -2,12 +2,14 @@ import Link from "next/link";
 import { currentRole } from "@/lib/auth";
 import { clientConfig } from "@/lib/clientConfig";
 import { fetchOwnAccount } from "@/lib/instagram";
+import { errorCount, readinessChecks, visibleTo } from "@/lib/checklist";
 import { groupGaps } from "@/lib/gaps";
 import { pushConfigured, vapidPublicKey } from "@/lib/push";
 import { dailyCostLimitUsd, overDailyCostLimit } from "@/lib/limits";
 import { configGaps, envGaps } from "@/lib/readiness";
 import { duration, overview } from "@/lib/stats";
 import {
+  countPushSubs,
   costSoFar,
   getEntryIds,
   getUnhandled,
@@ -140,12 +142,29 @@ export default async function Admin() {
 
   // A költség összegét csak a tulajdonos látja, de a plafon betelését az
   // ügyfélnek is tudnia kell — különben nem érti, miért hallgat a bot.
-  const [conversations, globalOn, cost, gaps] = await Promise.all([
+  const [conversations, globalOn, cost, gaps, pushSubs, resolved] = await Promise.all([
     listConversations(),
     isBotEnabled(),
     costSoFar(),
     listGaps(),
+    countPushSubs(),
+    clientConfig(),
   ]);
+
+  /**
+   * Indulási ellenőrzőlista. A hét minden éles hibája hiányos konfigurációból
+   * jött, és a rendszer mindezt tudta — csak nem mondta meg senkinek.
+   */
+  const checks = visibleTo(
+    readinessChecks({
+      config: resolved.config,
+      accountPinned: Boolean(process.env.IG_ACCOUNT_ID?.trim()),
+      pushConfigured: pushConfigured(),
+      pushSubs,
+    }),
+    owner,
+  );
+  const hibak = errorCount(checks);
   // amire a bot elakadt — ezekből lesznek a hiányzó GYIK-bejegyzések
   const hianyzoValaszok = groupGaps(gaps).slice(0, 8);
   const costLimit = dailyCostLimitUsd();
@@ -197,6 +216,49 @@ export default async function Admin() {
           </form>
         )}
       </div>
+
+      {checks.length > 0 && (
+        <section className="mt-6">
+          <div
+            className={`rounded-[14px] border p-5 ${
+              hibak > 0 ? "border-brick/30 bg-brick-soft" : "border-line bg-card"
+            }`}
+          >
+            <h2 className={`font-display text-[18px] font-bold ${hibak > 0 ? "text-brick" : ""}`}>
+              {hibak > 0
+                ? `${hibak} dolog miatt rosszul fog viselkedni a bot`
+                : "Pár dolog, amivel jobb lenne"}
+            </h2>
+
+            <ul className="mt-4 flex flex-col gap-3.5">
+              {checks.map((check) => (
+                <li key={check.id} className="flex gap-3">
+                  <span
+                    aria-hidden
+                    className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${
+                      check.level === "hiba" ? "bg-brick" : "bg-line-strong"
+                    }`}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-semibold">{check.title}</span>
+                    <span className="mt-0.5 block text-[15px] leading-relaxed text-muted">
+                      {check.detail}
+                    </span>
+                    {check.href && (
+                      <Link
+                        href={check.href}
+                        className="mt-1 inline-block text-[15px] font-semibold text-green"
+                      >
+                        Megoldom
+                      </Link>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {costCapReached && (
         <div className="mt-6">
