@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check": "node lib/handover.check.ts && node lib/webhook.check.ts && node lib/comments.check.ts && node lib/stats.check.ts && node lib/keys.check.ts && node lib/limits.check.ts && node lib/gaps.check.ts && node lib/echo.check.ts && node lib/notify.check.ts",
+    "check": "node lib/handover.check.ts && node lib/webhook.check.ts && node lib/comments.check.ts && node lib/stats.check.ts && node lib/keys.check.ts && node lib/limits.check.ts && node lib/gaps.check.ts && node lib/echo.check.ts && node lib/notify.check.ts && node lib/checklist.check.ts && node lib/preview.check.ts",
     "migrate-prefix": "node scripts/migrate-prefix.ts"
   },
   "dependencies": {
