@@ -74,6 +74,18 @@ assert.equal(errorCount(r3), 0, "a hiányzó nyilvános válasz csak ajánlás")
 // kikapcsolt szabályt nem ellenőrzünk
 assert.deepEqual(ids(alap({ config: szabalyos({ be: false, kulcsszavak: [] }) })), []);
 
+// --- utánkövetés bekapcsolva, de szöveg nélkül ---
+const ukUres = jóConfig(); ukUres.utankovetes = { be: true, orak: 6, maxDb: 1, szoveg: "  " };
+assert.ok(ids(alap({ config: ukUres })).includes("utankovetes-szoveg"));
+assert.equal(errorCount(readinessChecks(alap({ config: ukUres }))), 1, "szöveg nélküli utánkövetés valódi hiba");
+
+const ukJo = jóConfig(); ukJo.utankovetes = { be: true, orak: 6, maxDb: 1, szoveg: "Szia! Sikerült időpontot találnod?" };
+assert.ok(!ids(alap({ config: ukJo })).includes("utankovetes-szoveg"));
+
+// kikapcsolt utánkövetést nem kérünk számon
+const ukKi = jóConfig(); ukKi.utankovetes = { be: false, orak: 6, maxDb: 1, szoveg: "" };
+assert.ok(!ids(alap({ config: ukKi })).includes("utankovetes-szoveg"));
+
 // --- értesítés ---
 assert.ok(ids(alap({ pushSubs: 0 })).includes("nincs-ertesites"));
 assert.ok(

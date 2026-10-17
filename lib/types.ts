@@ -78,7 +78,26 @@ export type NoraConfig = {
     kampanyKulcsszo: string;
   };
   commentRules: CommentRule[];
+  utankovetes: Utankovetes;
 };
+
+/**
+ * Utánkövetés: egy udvarias emlékeztető, ha az érdeklődő elhallgat azután,
+ * hogy a bot válaszolt neki. Alapból KI van kapcsolva — kéretlen üzenetet
+ * küldeni más nevében csak szándékosan szabad.
+ */
+export type Utankovetes = {
+  be: boolean;
+  /** hány óra csend után; a Meta 24 órás ablaka miatt ennél tovább nem várhatunk */
+  orak: number;
+  /** hány emlékeztető mehet ki egy beszélgetésben összesen */
+  maxDb: number;
+  /** az emlékeztető szövege — üresen nem megy ki semmi */
+  szoveg: string;
+};
+
+/** A Meta 24 órás üzenetküldési ablaka. Ennél tovább nem írhatunk automatán. */
+export const UTANKOVETES_MAX_ORA = 20;
 
 export const ATADAS_ALAP = [
   "Panasz",
@@ -103,6 +122,7 @@ export const emptyConfig = (): NoraConfig => ({
   hatarok: { atadasEsetei: [...ATADAS_ALAP], sohaNeMondja: "", fallbackMondat: "" },
   inditok: { forrasok: [], kampanyKulcsszo: "" },
   commentRules: [],
+  utankovetes: { be: false, orak: 6, maxDb: 1, szoveg: "" },
 });
 
 /** Importált JSON-t összefésüli az üres alapértelmezéssel, hogy hiányzó mező ne dobjon hibát. */

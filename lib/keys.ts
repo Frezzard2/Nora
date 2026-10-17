@@ -64,6 +64,8 @@ export function makeKeys(rawPrefix: string | undefined | null) {
     pushSubs: `${p}:push-subs`,
     /** beszélgetésenkénti értesítés-fék, hogy ne szóljon percenként */
     pushThrottle: (convId: string) => `${p}:push-throttle:${convId}`,
+    /** utánkövetés-söprés féke */
+    followupSweep: `${p}:followup-sweep`,
   };
 }
 
@@ -91,5 +93,6 @@ export function sampleKeys(keys: Keys): string[] {
     keys.gaps,
     keys.pushSubs,
     keys.pushThrottle("u1"),
+    keys.followupSweep,
   ];
 }

@@ -130,6 +130,17 @@ export function readinessChecks(input: ChecklistInput): Check[] {
     }
   }
 
+  // --- utánkövetés ---
+  if (c.utankovetes?.be && !c.utankovetes.szoveg.trim()) {
+    out.push({
+      id: "utankovetes-szoveg",
+      level: "hiba",
+      title: "Az utánkövetés be van kapcsolva, de nincs szövege",
+      detail: "Így egyetlen emlékeztető sem megy ki. Írd meg a saját hangodon.",
+      href: BEALLITASOK,
+    });
+  }
+
   // --- hangnemi védőkorlátok ---
   if (!c.hatarok.sohaNeMondja.trim()) {
     out.push({
