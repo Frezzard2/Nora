@@ -4,6 +4,7 @@ import { currentRole } from "@/lib/auth";
 import { conversationExists, getConversation } from "@/lib/store";
 import { handOver, toggleConversation, toggleIgnore } from "../../actions";
 import { Empty, FromComment, Ignored, Notice, State, convName, money, when } from "../../ui";
+import ProbaValasz from "./preview";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,8 @@ export default async function Beszelgetes({ params }: { params: Promise<{ id: st
           ))
         )}
       </div>
+
+      {conv.messages.length > 0 && <ProbaValasz convId={conv.id} />}
     </main>
   );
 }

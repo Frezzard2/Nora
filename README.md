@@ -353,6 +353,8 @@ curl "http://localhost:3000/api/webhook?hub.mode=subscribe&hub.verify_token=$IG_
 | `lib/limits.ts` | Napi AI-költségplafon (tiszta függvények, önellenőrzött) |
 | `lib/gaps.ts` | „Amire nem tudott válaszolni" — a megválaszolatlan kérdések összevonása |
 | `lib/echo.ts` | Visszhang-osztályozás: bot vagy kézzel írt üzenet (önellenőrzött) |
+| `lib/checklist.ts` | Indulási ellenőrzőlista a konfigurációból (önellenőrzött) |
+| `lib/preview.ts` | A „mit válaszolna most?" előzmény-építése (önellenőrzött) |
 | `lib/notify.ts` | Az értesítés szövege és linkje (tiszta függvények, önellenőrzött) |
 | `lib/push.ts` | Push kiküldése, fék és lejárt feliratkozások takarítása |
 | `public/sw.js` | Service worker — csak értesítés, szándékosan nincs offline gyorsítótár |
@@ -467,6 +469,31 @@ adott beszélgetés nyílik meg.
 
 A feliratkozás eszközönként külön él, és a névtérben tárolódik — több telefon is
 kaphat értesítést. A lejárt feliratkozásokat a rendszer magától kitakarítja.
+
+## Javítókör: a rendszer megmondja, mit kell javítani
+
+Két eszköz, ami együtt zárja a kört.
+
+**1. Indulási ellenőrzőlista** az `/admin` tetején. A konfigurációból kiolvasható
+minden olyan hiányosság, ami éles beszélgetésben rossz viselkedést okoz:
+
+- nincs egyetlen gyakori kérdés sem → a bot hajlamos **kitalálni** egy adatot
+- nincs ár és nem is elárulható → az ár-kérdésre nem tud mit mondani
+- komment-szabály kulcsszó nélkül, 3 karakternél rövidebb kulcsszóval, vagy
+  nyilvános válasz nélkül
+- nincs feliratkozott eszköz az értesítésre
+
+A valódi hibák pirosan, az ajánlások halványan. A lista szándékosan **nem**
+tiltja le a vészkapcsolót: tájékoztat, a döntés a tiéd.
+
+**2. „Mit válaszolna most?"** gomb minden beszélgetés alján. Lefuttatja az adott
+beszélgetést a **jelenlegi** beállításokkal, és megmutatja a választ.
+
+Ezzel a konfiguráció-szerkesztés találgatásból bizonyítékká válik: átírod a
+GYIK-et, megnyomod egy régi beszélgetésen, és azonnal látod, javult-e — ahelyett,
+hogy egy valódi érdeklődőn derülne ki. **Semmi nem megy ki Instagramra**, a válasz
+sehova nem tárolódik. A próba valódi AI-hívás, ezért a napi költségplafon rá is
+vonatkozik.
 
 ## Biztonsági korlátok
 
