@@ -2,13 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { currentRole } from "@/lib/auth";
+import { clientConfig } from "@/lib/clientConfig";
+import { dailyCostLimitUsd, overDailyCostLimit } from "@/lib/limits";
+import { historyForPreview, lastIncoming } from "@/lib/preview";
 import { sendTestNotification } from "@/lib/push";
-import { configGaps } from "@/lib/readiness";
+import { generateReply } from "@/lib/reply-engine";
+import { configGaps, gapSentence } from "@/lib/readiness";
 import {
   addPushSub,
+  bumpCost,
   clearEntryIds,
   clearGaps,
   conversationExists,
+  costSoFar,
+  getConversation,
   removePushSub,
   setBotEnabled,
   setStoredConfig,
@@ -139,6 +146,68 @@ export async function sendPushTest() {
   return ok
     ? { ok: true, uzenet: `Elküldve ${kiment} eszközre. Nézd meg a telefonodat.` }
     : { ok: false, uzenet: "Nem sikerült elküldeni. Van feliratkozott eszköz?" };
+}
+
+export type PreviewResult = {
+  ok: boolean;
+  /** mire válaszolna — a beszélgetés utolsó bejövő üzenete */
+  kerdes?: string;
+  valasz?: string;
+  atadas?: boolean;
+  error?: string;
+};
+
+/**
+ * „Mit válaszolna most?" — a beszélgetés lefuttatása a JELENLEGI beállításokkal.
+ *
+ * Így lehet egy konfiguráció-módosítást valódi beszélgetésen ellenőrizni,
+ * mielőtt éles érdeklődőn derülne ki, hogy nem jó. SEMMI nem megy ki
+ * Instagramra: a válasz csak visszatér, sehova nem tároljuk.
+ */
+export async function replyPreview(convId: string): Promise<PreviewResult> {
+  await currentRole();
+
+  const id = convId.trim();
+  if (!id || !(await conversationExists(id))) {
+    return { ok: false, error: "Ez a beszélgetés nem található." };
+  }
+
+  const conv = await getConversation(id);
+  const history = historyForPreview(conv.messages);
+  if (!history) {
+    return { ok: false, error: "Ebben a beszélgetésben még nincs bejövő üzenet, amire válaszolhatna." };
+  }
+
+  const { config } = await clientConfig();
+  const gaps = configGaps(config);
+  if (gaps.length) {
+    return { ok: false, error: `Előbb töltsd ki a beállításoknál: ${gapSentence(gaps)}.` };
+  }
+
+  // A próba valódi AI-hívás, tehát a napi plafon rá is vonatkozik.
+  const limit = dailyCostLimitUsd();
+  const { today } = await costSoFar();
+  if (overDailyCostLimit(today, limit)) {
+    return { ok: false, error: "A mai AI-költségplafon betelt, ezért a próba sem fut le." };
+  }
+
+  try {
+    const reply = await generateReply(
+      config,
+      history.map((m) => ({ source: "proba", role: m.role, text: m.text })),
+    );
+    if (reply.usage?.costUsd) await bumpCost(reply.usage.costUsd);
+
+    return {
+      ok: true,
+      kerdes: lastIncoming(conv.messages) ?? undefined,
+      valasz: reply.text.trim(),
+      atadas: reply.handover,
+    };
+  } catch (err) {
+    console.error("[admin] Próba-válasz sikertelen:", err instanceof Error ? err.message : err);
+    return { ok: false, error: "A próba most nem sikerült. Próbáld újra kicsit később." };
+  }
 }
 
 export type SaveResult = { ok: boolean; gaps?: string[]; error?: string };
